@@ -1,0 +1,19 @@
+# Core Framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.12
+
+# Data Validation
+pydantic>=2.10.0
+pydantic-settings>=2.1.0
+
+# HTTP Client
+requests>=2.32.0
+
+# Environment Variables
+python-dotenv>=1.0.0
+
+# Java Integration (MPP parsing)
+jpype1>=1.4.0
+mpxj>=15.0.0
+
