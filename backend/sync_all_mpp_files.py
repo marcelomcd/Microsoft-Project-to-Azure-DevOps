@@ -2,12 +2,14 @@
 Script para sincronizar todos os arquivos .mpp do workspace com o Azure DevOps.
 
 Este script:
-1. Encontra todos os arquivos .mpp no workspace
-2. Para cada arquivo, extrai o Work Item ID do nome
-3. Faz upload e parse do arquivo
-4. Sincroniza User Stories e Tasks com o Azure DevOps
-5. Garante que Tasks estejam vinculadas corretamente aos User Stories
-6. Sincroniza datas corretamente
+1. Encontra todos os arquivos .mpp no diretório configurado
+2. Usa histórico de sincronização para processar apenas arquivos novos ou modificados
+3. Para cada arquivo, extrai o Work Item ID do nome
+4. Faz parse e conversão para Azure DevOps
+5. Atualiza histórico após processamento bem-sucedido
+6. Gera relatório final
+
+NOTA: Para execução agendada na pipeline, use pipeline_sync.py
 """
 import os
 import sys
@@ -18,148 +20,133 @@ from typing import List, Dict, Any
 backend_dir = Path(__file__).parent
 sys.path.insert(0, str(backend_dir))
 
-from app.services.mpp_parser import MPPParser
-from app.services.mapper_service import MapperService
+from app.config import settings
+from app.services.file_processor import FileProcessor
+from app.services.sync_history import SyncHistoryService
 from app.services.devops_client import AzureDevOpsClient
-from app.utils.validators import validate_mpp_filename
 
 
-def find_mpp_files(workspace_root: Path) -> List[Path]:
-    """Encontra todos os arquivos .mpp no workspace"""
-    mpp_files = []
+def find_mpp_files(directory: Path) -> List[Path]:
+    """
+    Encontra todos os arquivos .mpp no diretório especificado.
     
-    # Busca na raiz do workspace
-    for file in workspace_root.glob("*.mpp"):
-        mpp_files.append(file)
+    Args:
+        directory: Diretório onde buscar arquivos .mpp
+        
+    Returns:
+        Lista de caminhos de arquivos .mpp encontrados
+    """
+    if not directory.exists():
+        print(f"Aviso: Diretório não existe: {directory}")
+        return []
     
-    # Busca no diretório backend/uploads
-    uploads_dir = workspace_root / "backend" / "uploads"
-    if uploads_dir.exists():
-        for file in uploads_dir.glob("*.mpp"):
-            mpp_files.append(file)
-    
-    return mpp_files
-
-
-def extract_work_item_id(filename: str) -> int:
-    """Extrai Work Item ID do nome do arquivo"""
-    work_item_id, _ = validate_mpp_filename(filename)
-    if work_item_id:
-        try:
-            return int(work_item_id)
-        except (ValueError, TypeError):
-            pass
-    return None
-
-
-def sync_mpp_file(file_path: Path, mapper_service: MapperService, parser: MPPParser) -> Dict[str, Any]:
-    """Sincroniza um arquivo .mpp com o Azure DevOps"""
-    filename = file_path.name
-    work_item_id = extract_work_item_id(filename)
-    
-    if not work_item_id:
-        return {
-            "file": filename,
-            "success": False,
-            "error": f"Nao foi possivel extrair Work Item ID do nome do arquivo: {filename}"
-        }
-    
-    print(f"\n{'='*80}")
-    print(f"Processando arquivo: {filename}")
-    print(f"Work Item ID: {work_item_id}")
-    print(f"{'='*80}")
-    
-    try:
-        # Parse do arquivo
-        print(f"Parseando arquivo {filename}...")
-        parsed_data = parser.parse_file(str(file_path), original_filename=filename)
-        
-        print(f"  - Projeto: {parsed_data.project.name}")
-        print(f"  - User Stories: {len(parsed_data.user_stories)}")
-        print(f"  - Tasks: {len(parsed_data.tasks)}")
-        
-        # Sincroniza com Azure DevOps
-        print(f"Sincronizando com Azure DevOps (Feature ID: {work_item_id})...")
-        result = mapper_service.convert_to_devops(
-            parsed_data=parsed_data,
-            skip_duplicates=True,
-            parent_feature_id=work_item_id,
-            update_existing=True  # Atualiza itens existentes
-        )
-        
-        print(f"\nResultado da sincronizacao:")
-        print(f"  + User Stories criadas: {result.created_user_stories}")
-        print(f"  + User Stories atualizadas: {result.updated_user_stories or 0}")
-        print(f"  - User Stories puladas: {result.skipped_user_stories}")
-        print(f"  + Tasks criadas: {result.created_tasks}")
-        print(f"  + Tasks atualizadas: {result.updated_tasks or 0}")
-        print(f"  - Tasks puladas: {result.skipped_tasks}")
-        
-        if result.errors:
-            print(f"\nErros encontrados ({len(result.errors)}):")
-            for error in result.errors:
-                print(f"  - {error}")
-        
-        return {
-            "file": filename,
-            "work_item_id": work_item_id,
-            "success": True,
-            "result": {
-                "created_user_stories": result.created_user_stories,
-                "updated_user_stories": result.updated_user_stories or 0,
-                "skipped_user_stories": result.skipped_user_stories,
-                "created_tasks": result.created_tasks,
-                "updated_tasks": result.updated_tasks or 0,
-                "skipped_tasks": result.skipped_tasks,
-                "errors": result.errors
-            }
-        }
-        
-    except Exception as e:
-        error_msg = f"Erro ao processar arquivo {filename}: {str(e)}"
-        print(f"❌ {error_msg}")
-        import traceback
-        traceback.print_exc()
-        return {
-            "file": filename,
-            "work_item_id": work_item_id,
-            "success": False,
-            "error": error_msg
-        }
+    mpp_files = list(directory.glob("*.mpp"))
+    return sorted(mpp_files)
 
 
 def main():
     """Função principal"""
-    # Determina o diretório raiz do workspace
-    # Assume que o script está em backend/, então sobe um nível
-    script_dir = Path(__file__).parent
-    workspace_root = script_dir.parent
+    print("=" * 80)
+    print("Sincronização de Arquivos .mpp com Azure DevOps")
+    print("=" * 80)
     
-    print(f"Workspace root: {workspace_root}")
-    print(f"Buscando arquivos .mpp...")
+    # Determina diretório de arquivos
+    if settings.MPP_FILES_DIR:
+        mpp_files_dir = Path(settings.MPP_FILES_DIR)
+    else:
+        # Fallback: usa diretório backend/uploads
+        script_dir = Path(__file__).parent
+        mpp_files_dir = script_dir / "uploads"
+        print(f"Aviso: MPP_FILES_DIR não configurado. Usando diretório padrão: {mpp_files_dir}")
     
-    # Encontra todos os arquivos .mpp
-    mpp_files = find_mpp_files(workspace_root)
+    print(f"Diretório de arquivos: {mpp_files_dir}")
+    
+    if not mpp_files_dir.exists():
+        print(f"Erro: Diretório não existe: {mpp_files_dir}")
+        return
+    
+    # Inicializa serviços
+    print("\nInicializando serviços...")
+    history_service = SyncHistoryService()
+    devops_client = AzureDevOpsClient()
+    file_processor = FileProcessor(devops_client=devops_client)
+    
+    # Encontra arquivos .mpp
+    print(f"\nBuscando arquivos .mpp...")
+    mpp_files = find_mpp_files(mpp_files_dir)
     
     if not mpp_files:
-        print("Nenhum arquivo .mpp encontrado no workspace.")
+        print("Nenhum arquivo .mpp encontrado.")
         return
     
     print(f"Encontrados {len(mpp_files)} arquivo(s) .mpp:")
     for file in mpp_files:
-        print(f"  - {file.name}")
+        # Verifica se deve processar
+        should_process = history_service.should_process_file(file)
+        status = "[NOVO/MODIFICADO]" if should_process else "[NÃO MODIFICADO]"
+        print(f"  {status} {file.name}")
     
-    # Inicializa serviços
-    print("\nInicializando serviços...")
-    parser = MPPParser()
-    devops_client = AzureDevOpsClient()
-    mapper_service = MapperService(devops_client)
+    # Filtra apenas arquivos que devem ser processados
+    files_to_process = [f for f in mpp_files if history_service.should_process_file(f)]
+    
+    if not files_to_process:
+        print("\nNenhum arquivo precisa ser processado (todos estão atualizados).")
+        return
+    
+    print(f"\nProcessando {len(files_to_process)} arquivo(s)...")
     
     # Processa cada arquivo
     results = []
-    for mpp_file in mpp_files:
-        result = sync_mpp_file(mpp_file, mapper_service, parser)
-        results.append(result)
+    for mpp_file in files_to_process:
+        filename = mpp_file.name
+        print(f"\n{'='*80}")
+        print(f"Processando: {filename}")
+        print(f"{'='*80}")
+        
+        result = file_processor.process_mpp_file(
+            file_path=mpp_file,
+            update_existing=True,
+            skip_duplicates=True
+        )
+        
+        if result["success"]:
+            # Atualiza histórico
+            history_service.update_file_history(
+                filename=filename,
+                work_item_id=result["work_item_id"],
+                file_path=mpp_file
+            )
+            
+            conv_result = result.get("conversion_result")
+            file_result = {
+                "file": filename,
+                "work_item_id": result["work_item_id"],
+                "success": True,
+                "result": {
+                    "created_user_stories": conv_result.created_user_stories if conv_result else 0,
+                    "updated_user_stories": conv_result.updated_user_stories if conv_result else 0,
+                    "skipped_user_stories": conv_result.skipped_user_stories if conv_result else 0,
+                    "created_tasks": conv_result.created_tasks if conv_result else 0,
+                    "updated_tasks": conv_result.updated_tasks if conv_result else 0,
+                    "skipped_tasks": conv_result.skipped_tasks if conv_result else 0,
+                    "errors": conv_result.errors if conv_result else []
+                }
+            }
+        else:
+            file_result = {
+                "file": filename,
+                "success": False,
+                "error": result.get("error", "Erro desconhecido")
+            }
+        
+        results.append(file_result)
+    
+    # Salva histórico
+    try:
+        history_service.save_history()
+        print("\nHistórico de sincronização salvo")
+    except Exception as e:
+        print(f"\nErro ao salvar histórico: {e}")
     
     # Resumo final
     print(f"\n{'='*80}")

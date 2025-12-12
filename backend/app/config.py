@@ -79,36 +79,44 @@ class Settings(BaseSettings):
         description="Timeout padrão para requisições à API (segundos)"
     )
     
-    # SharePoint
-    SHAREPOINT_SITE_URL: str = Field(
+    # Pipeline/Scheduled Execution
+    MPP_FILES_DIR: str = Field(
         default="",
-        description="URL do site do SharePoint (ex: https://qualiitcombr.sharepoint.com/sites/projetosqualiit)"
+        description="Diretório onde os arquivos .mpp estão localizados (obrigatório se usar diretório local)"
     )
-    SHAREPOINT_FOLDER_PATH: str = Field(
-        default="Documentos Compartilhados/Cronogramas - Project",
-        description="Caminho da pasta dentro do site do SharePoint"
+    SYNC_HISTORY_FILE: str = Field(
+        default="logs/sync_history.json",
+        description="Caminho relativo do arquivo de histórico de sincronização"
     )
+    TIMEZONE: str = Field(
+        default="America/Sao_Paulo",
+        description="Timezone para processamento (padrão: America/Sao_Paulo - Horário de Brasília)"
+    )
+    
+    # SharePoint Integration (OAuth2)
     SHAREPOINT_CLIENT_ID: str = Field(
         default="",
-        description="Client ID do App Registration no Azure AD"
+        description="Client ID (Application ID) do Microsoft Entra ID para SharePoint"
     )
     SHAREPOINT_CLIENT_SECRET: str = Field(
         default="",
-        description="Client Secret do App Registration (opcional, se usar app registration)"
+        description="Client Secret do Microsoft Entra ID para SharePoint (obrigatório se usar SharePoint)"
     )
     SHAREPOINT_TENANT_ID: str = Field(
         default="",
-        description="Tenant ID do Azure AD"
+        description="Tenant ID (Directory ID) do Microsoft Entra ID (obrigatório se usar SharePoint)"
     )
-    SHAREPOINT_AUTHORITY: str = Field(
-        default="https://login.microsoftonline.com",
-        description="URL base de autoridade do Azure AD"
+    SHAREPOINT_SITE_URL: str = Field(
+        default="",
+        description="URL do site SharePoint (ex: https://qualiitcombr-my.sharepoint.com/sites/projetosqualiit)"
     )
-    
-    # Pipeline
-    LAST_RUN_TIMESTAMP_FILE: str = Field(
-        default="pipeline_state.json",
-        description="Arquivo para armazenar timestamp da última execução da pipeline"
+    SHAREPOINT_FOLDER_PATH: str = Field(
+        default="Documentos Compartilhados/Cronogramas - Project",
+        description="Caminho da pasta no SharePoint onde os arquivos .mpp estão localizados"
+    )
+    USE_SHAREPOINT: bool = Field(
+        default=False,
+        description="Se True, usa SharePoint como fonte de arquivos. Se False, usa MPP_FILES_DIR"
     )
 
 

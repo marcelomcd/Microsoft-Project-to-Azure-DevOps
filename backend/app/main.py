@@ -10,7 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
-from app.routers import upload, workitems, projects, convert, monitor
+from app.routers import upload, workitems, projects, convert
 
 # Configuração de logging
 logging.basicConfig(
@@ -72,7 +72,6 @@ app.include_router(upload.router, prefix=settings.API_V1_PREFIX, tags=["Upload"]
 app.include_router(workitems.router, prefix=settings.API_V1_PREFIX, tags=["Work Items"])
 app.include_router(projects.router, prefix=settings.API_V1_PREFIX, tags=["Projects"])
 app.include_router(convert.router, prefix=settings.API_V1_PREFIX, tags=["Convert"])
-app.include_router(monitor.router, prefix=settings.API_V1_PREFIX, tags=["Monitor"])
 
 
 @app.get("/", response_model=Dict[str, Any])

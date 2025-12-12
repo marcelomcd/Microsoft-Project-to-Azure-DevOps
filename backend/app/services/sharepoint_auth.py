@@ -1,224 +1,100 @@
-"""Serviço de autenticação SharePoint usando OAuth 2.0 com Microsoft Graph API"""
-import os
-import json
-from typing import Optional, Dict, Any
-from pathlib import Path
-import msal
+"""Serviço de autenticação SharePoint usando OAuth2 (Microsoft Entra ID)"""
+import logging
+from typing import Optional
+from msal import ConfidentialClientApplication
+from datetime import datetime, timedelta
 
 from app.config import settings
 
+logger = logging.getLogger(__name__)
 
-class SharePointAuth:
-    """Gerencia autenticação OAuth 2.0 para Microsoft Graph API"""
+
+class SharePointAuthService:
+    """Gerencia autenticação OAuth2 para SharePoint"""
     
-    # Escopos necessários para acessar SharePoint
-    SCOPES = [
-        "https://graph.microsoft.com/Sites.Read.All",
-        "https://graph.microsoft.com/Files.Read.All",
-        "offline_access"  # Para obter refresh token
-    ]
-    
-    def __init__(self):
-        """Inicializa o serviço de autenticação"""
-        self.client_id = settings.SHAREPOINT_CLIENT_ID
-        self.client_secret = settings.SHAREPOINT_CLIENT_SECRET
-        self.tenant_id = settings.SHAREPOINT_TENANT_ID
-        
-        # Valida configurações obrigatórias
-        if not self.client_id:
-            raise ValueError("SHAREPOINT_CLIENT_ID não configurado no arquivo .env")
-        if not self.tenant_id:
-            raise ValueError("SHAREPOINT_TENANT_ID não configurado no arquivo .env")
-        
-        # Constrói authority sempre com tenant (obrigatório para MSAL)
-        self.authority = f"{settings.SHAREPOINT_AUTHORITY}/{self.tenant_id}"
-        
-        # Caminho para armazenar tokens
-        self.token_cache_path = Path(__file__).parent.parent.parent / ".token_cache.json"
-        
-        # Detecta se usa Application permissions (com Client Secret) ou Delegated (login interativo)
-        self.use_application_permissions = bool(self.client_secret and self.client_secret.strip())
-        
-        # Valida Client Secret se usar Application permissions
-        if self.use_application_permissions and not self.client_secret.strip():
-            raise ValueError("SHAREPOINT_CLIENT_SECRET não configurado no arquivo .env (necessário para Application permissions)")
-        
-        # Inicializa aplicação MSAL baseado no tipo
-        try:
-            if self.use_application_permissions:
-                # Application permissions - usa ConfidentialClientApplication
-                self.app = msal.ConfidentialClientApplication(
-                    client_id=self.client_id,
-                    client_credential=self.client_secret,
-                    authority=self.authority,
-                    token_cache=msal.SerializableTokenCache()
-                )
-            else:
-                # Delegated permissions - usa PublicClientApplication (login interativo)
-                self.app = msal.PublicClientApplication(
-                    client_id=self.client_id,
-                    authority=self.authority,
-                    token_cache=msal.SerializableTokenCache()
-                )
-        except Exception as e:
-            raise ValueError(f"Erro ao inicializar MSAL. Verifique as configurações no .env: {str(e)}")
-        
-        # Carrega cache de tokens se existir
-        self._load_token_cache()
-    
-    def _load_token_cache(self) -> None:
-        """Carrega cache de tokens do arquivo"""
-        if self.token_cache_path.exists():
-            try:
-                with open(self.token_cache_path, 'r') as f:
-                    cache_data = json.load(f)
-                    self.app.token_cache.deserialize(json.dumps(cache_data))
-            except Exception as e:
-                print(f"Aviso: Não foi possível carregar cache de tokens: {e}")
-    
-    def _save_token_cache(self) -> None:
-        """Salva cache de tokens no arquivo"""
-        try:
-            if self.app.token_cache.has_state_changed:
-                cache_data = json.loads(self.app.token_cache.serialize())
-                with open(self.token_cache_path, 'w') as f:
-                    json.dump(cache_data, f, indent=2)
-        except Exception as e:
-            print(f"Aviso: Não foi possível salvar cache de tokens: {e}")
-    
-    def get_access_token(self) -> Optional[str]:
+    def __init__(
+        self,
+        client_id: Optional[str] = None,
+        client_secret: Optional[str] = None,
+        tenant_id: Optional[str] = None
+    ):
         """
-        Obtém token de acesso válido.
+        Inicializa o serviço de autenticação.
         
-        Para Application permissions: usa Client Credentials flow (sem usuário)
-        Para Delegated permissions: usa login interativo
+        Args:
+            client_id: Client ID (Application ID) do Microsoft Entra ID
+            client_secret: Client Secret
+            tenant_id: Tenant ID (Directory ID)
+        """
+        self.client_id = client_id or settings.SHAREPOINT_CLIENT_ID
+        self.client_secret = client_secret or settings.SHAREPOINT_CLIENT_SECRET
+        self.tenant_id = tenant_id or settings.SHAREPOINT_TENANT_ID
         
+        if not self.client_id or not self.client_secret or not self.tenant_id:
+            raise ValueError(
+                "Configurações do SharePoint não estão completas. "
+                "Configure SHAREPOINT_CLIENT_ID, SHAREPOINT_CLIENT_SECRET e SHAREPOINT_TENANT_ID."
+            )
+        
+        # Authority URL para Microsoft Entra ID
+        self.authority = f"https://login.microsoftonline.com/{self.tenant_id}"
+        
+        # Scope necessário para SharePoint
+        self.scope = ["https://graph.microsoft.com/.default"]
+        
+        # Inicializa aplicação MSAL
+        self.app = ConfidentialClientApplication(
+            client_id=self.client_id,
+            client_credential=self.client_secret,
+            authority=self.authority
+        )
+        
+        # Cache de token
+        self._access_token: Optional[str] = None
+        self._token_expires_at: Optional[datetime] = None
+    
+    def get_access_token(self, force_refresh: bool = False) -> str:
+        """
+        Obtém access token válido (usa cache se disponível).
+        
+        Args:
+            force_refresh: Se True, força renovação do token
+            
         Returns:
-            Token de acesso ou None se falhar
+            Access token JWT
+            
+        Raises:
+            ValueError: Se não conseguir obter token
         """
-        if self.use_application_permissions:
-            # Application permissions - Client Credentials flow
-            return self._get_application_token()
+        # Verifica se token em cache ainda é válido
+        if not force_refresh and self._access_token and self._token_expires_at:
+            # Renova com 5 minutos de antecedência
+            if datetime.now() < (self._token_expires_at - timedelta(minutes=5)):
+                logger.debug("Usando token em cache")
+                return self._access_token
+        
+        logger.info("Obtendo novo access token do Microsoft Entra ID")
+        
+        # Obtém token usando client credentials flow
+        result = self.app.acquire_token_for_client(scopes=self.scope)
+        
+        if "access_token" in result:
+            self._access_token = result["access_token"]
+            
+            # Calcula tempo de expiração (default 3600 segundos)
+            expires_in = result.get("expires_in", 3600)
+            self._token_expires_at = datetime.now() + timedelta(seconds=expires_in - 300)  # -5 min para segurança
+            
+            logger.info(f"Token obtido com sucesso. Expira em: {self._token_expires_at}")
+            return self._access_token
         else:
-            # Delegated permissions - login interativo
-            return self._get_delegated_token()
+            error_msg = result.get("error_description", result.get("error", "Erro desconhecido"))
+            logger.error(f"Falha ao obter access token: {error_msg}")
+            raise ValueError(f"Falha na autenticação: {error_msg}")
     
-    def _get_application_token(self) -> Optional[str]:
-        """Obtém token usando Application permissions (Client Credentials)"""
-        try:
-            # Para Application permissions, não precisa de scopes específicos
-            # Usa apenas o endpoint padrão
-            result = self.app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
-            
-            if result and "access_token" in result:
-                self._save_token_cache()
-                return result["access_token"]
-            else:
-                error = result.get("error_description", result.get("error", "Erro desconhecido"))
-                print(f"Erro ao obter token de aplicação: {error}")
-                return None
-        except Exception as e:
-            print(f"Erro ao obter token de aplicação: {e}")
-            return None
-    
-    def _get_delegated_token(self) -> Optional[str]:
-        """Obtém token usando Delegated permissions (login interativo)"""
-        # Tenta obter token do cache
-        accounts = self.app.get_accounts()
-        if accounts:
-            # Tenta obter token silenciosamente
-            result = self.app.acquire_token_silent(
-                scopes=self.SCOPES,
-                account=accounts[0]
-            )
-            
-            if result and "access_token" in result:
-                self._save_token_cache()
-                return result["access_token"]
-        
-        # Se não conseguiu token silenciosamente, tenta login interativo
-        print("Token não encontrado ou expirado. Iniciando login interativo...")
-        result = self._interactive_login()
-        
-        if result and "access_token" in result:
-            self._save_token_cache()
-            return result["access_token"]
-        
-        return None
-    
-    def _interactive_login(self) -> Optional[Dict[str, Any]]:
-        """
-        Realiza login interativo via navegador.
-        
-        Returns:
-            Resultado da autenticação com access_token ou None
-        """
-        try:
-            # Fluxo de autorização interativa
-            result = self.app.acquire_token_interactive(
-                scopes=self.SCOPES,
-                prompt="select_account"  # Permite selecionar conta
-            )
-            
-            if "access_token" in result:
-                print("✓ Autenticação bem-sucedida!")
-                return result
-            else:
-                error = result.get("error_description", result.get("error", "Erro desconhecido"))
-                print(f"✗ Erro na autenticação: {error}")
-                return None
-                
-        except Exception as e:
-            print(f"✗ Erro durante login interativo: {e}")
-            return None
-    
-    def refresh_token(self) -> Optional[str]:
-        """
-        Renova token usando refresh token.
-        
-        Returns:
-            Novo token de acesso ou None se falhar
-        """
-        accounts = self.app.get_accounts()
-        if not accounts:
-            return None
-        
-        try:
-            result = self.app.acquire_token_silent(
-                scopes=self.SCOPES,
-                account=accounts[0],
-                force_refresh=True
-            )
-            
-            if result and "access_token" in result:
-                self._save_token_cache()
-                return result["access_token"]
-        except Exception as e:
-            print(f"Erro ao renovar token: {e}")
-        
-        return None
-    
-    def is_authenticated(self) -> bool:
-        """
-        Verifica se há autenticação válida.
-        
-        Returns:
-            True se há token válido, False caso contrário
-        """
-        token = self.get_access_token()
-        return token is not None
-    
-    def logout(self) -> None:
-        """Remove tokens e limpa cache"""
-        accounts = self.app.get_accounts()
-        for account in accounts:
-            self.app.remove_account(account)
-        
-        # Remove arquivo de cache
-        if self.token_cache_path.exists():
-            try:
-                os.remove(self.token_cache_path)
-            except Exception as e:
-                print(f"Erro ao remover cache: {e}")
-        
-        print("Logout realizado com sucesso")
+    def clear_token_cache(self) -> None:
+        """Limpa cache de token (força renovação na próxima chamada)"""
+        self._access_token = None
+        self._token_expires_at = None
+        logger.debug("Cache de token limpo")
+
