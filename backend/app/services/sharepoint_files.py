@@ -230,18 +230,43 @@ class SharePointFileService:
                     debug_response = requests.get(
                         debug_url,
                         headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
-                        params={"$filter": "folder ne null", "$select": "name,id"},
+                        params={"$select": "name,id,folder"},
                         timeout=30
                     )
                     if debug_response.status_code == 200:
                         debug_data = debug_response.json()
-                        folders = debug_data.get("value", [])
+                        items = debug_data.get("value", [])
+                        folders = [item for item in items if item.get("folder") is not None]
+                        files = [item for item in items if item.get("file") is not None]
+                        
                         if folders:
                             folder_names = [f.get("name", "") for f in folders]
-                            logger.info(f"Pastas disponíveis na raiz: {', '.join(folder_names)}")
+                            logger.info(f"📁 Pastas disponíveis na raiz: {', '.join(folder_names)}")
+                        
+                        if files:
+                            file_names = [f.get("name", "") for f in files if f.get("name", "").lower().endswith(".mpp")]
+                            if file_names:
+                                logger.info(f"📄 Arquivos .mpp encontrados na raiz: {', '.join(file_names)}")
                 except Exception as e:
-                    logger.debug(f"Erro ao listar pastas para debug: {e}")
-                folder_id = "root"
+                    logger.warning(f"Erro ao listar pastas para debug: {e}")
+                
+                # Tenta variações do caminho
+                folder_variations = [
+                    "Cronogramas - Project",  # Apenas subpasta
+                    "Cronogramas-Project",    # Sem espaços
+                    "CronogramasProject",     # Sem espaços e hífen
+                ]
+                
+                for variation in folder_variations:
+                    logger.info(f"Tentando caminho alternativo: {variation}")
+                    folder_id = self._get_folder_id(drive_id, variation)
+                    if folder_id:
+                        logger.info(f"✅ Pasta encontrada com caminho: {variation}")
+                        break
+                
+                if not folder_id:
+                    logger.warning("Nenhuma variação do caminho funcionou. Usando pasta raiz.")
+                    folder_id = "root"
             
             # Lista arquivos na pasta
             access_token = self.auth_service.get_access_token()
