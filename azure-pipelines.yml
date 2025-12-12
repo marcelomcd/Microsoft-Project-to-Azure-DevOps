@@ -56,7 +56,7 @@ steps:
     displayName: 'Configurar Java JDK $(JAVA_VERSION)'
     inputs:
       versionSpec: '$(JAVA_VERSION)'
-      jdkArchitecture: 'x64'
+      jdkArchitectureOption: 'x64'
       jdkSourceOption: 'PreInstalled'
 
   # Step 4: Instalar dependências Python
