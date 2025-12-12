@@ -61,11 +61,6 @@ run: ## Inicia o servidor de desenvolvimento
 run-prod: ## Inicia o servidor de produção
 	uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 
-profile: ## Executa profiling de código
-	python scripts/profile_code.py
-
-benchmark: ## Executa benchmark de performance
-	python scripts/performance_benchmark.py
 
 ci: ## Executa todas as verificações para CI/CD
 	format-check
