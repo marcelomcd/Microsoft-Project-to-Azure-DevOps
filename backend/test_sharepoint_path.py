@@ -11,6 +11,7 @@ Este script:
 import sys
 import os
 from pathlib import Path
+import requests
 
 # Adiciona o diretório backend ao path
 backend_dir = Path(__file__).parent
@@ -112,7 +113,7 @@ def list_folders_and_files(service: SharePointFileService, folder_path: str = ""
         traceback.print_exc()
         return [], []
 
-def search_mpp_files_recursive(service: SharePointFileService, folder_path: str = "", depth: int = 0, max_depth: int = 3):
+def search_mpp_files_recursive(service: SharePointFileService, folder_path: str = "", depth: int = 0, max_depth: int = 5):
     """
     Busca arquivos .mpp recursivamente em todas as pastas.
     
@@ -141,14 +142,19 @@ def search_mpp_files_recursive(service: SharePointFileService, folder_path: str 
                 "modified": file.get("lastModifiedDateTime", "")
             })
     
-    # Busca recursivamente nas subpastas
-    for folder in folders:
-        folder_name = folder.get("name", "")
-        new_path = f"{folder_path}/{folder_name}" if folder_path else folder_name
-        
-        print(f"\n🔍 Buscando em: {new_path}")
-        subfolder_mpp = search_mpp_files_recursive(service, new_path, depth + 1, max_depth)
-        all_mpp_files.extend(subfolder_mpp)
+        # Busca recursivamente nas subpastas
+        for folder in folders:
+            folder_name = folder.get("name", "")
+            new_path = f"{folder_path}/{folder_name}" if folder_path else folder_name
+            
+            indent = "  " * depth
+            print(f"{indent}🔍 Buscando em: {new_path}")
+            subfolder_mpp = search_mpp_files_recursive(service, new_path, depth + 1, max_depth)
+            all_mpp_files.extend(subfolder_mpp)
+            
+            # Se encontrou arquivos nesta subpasta, mostra
+            if subfolder_mpp:
+                print(f"{indent}   ✅ Encontrados {len(subfolder_mpp)} arquivo(s) .mpp nesta pasta!")
     
     return all_mpp_files
 
@@ -208,11 +214,29 @@ def main():
         print("   (deixe vazio ou não configure)")
         return 0
     
+    # Lista todas as bibliotecas de documentos disponíveis
+    print_section("📚 BIBLIOTECAS DE DOCUMENTOS DISPONÍVEIS")
+    try:
+        site_id = service._get_site_id()
+        drives = service._get_drive_id(site_id, return_all=True)
+        
+        if isinstance(drives, list) and len(drives) > 1:
+            print(f"✅ Encontradas {len(drives)} biblioteca(s) de documentos:\n")
+            for i, drive in enumerate(drives, 1):
+                drive_name = drive.get("name", "Sem nome")
+                drive_id = drive.get("id", "")
+                print(f"   {i}. {drive_name} (ID: {drive_id[:20]}...)")
+            print("\n💡 Tentando buscar arquivos .mpp em todas as bibliotecas...\n")
+        else:
+            print("✅ Usando biblioteca de documentos padrão\n")
+    except Exception as e:
+        print(f"⚠️  Não foi possível listar bibliotecas: {e}\n")
+    
     # Busca recursivamente
     print_section("🔍 BUSCANDO ARQUIVOS .MPP RECURSIVAMENTE")
-    print("Buscando em todas as pastas (máximo 3 níveis de profundidade)...\n")
+    print("Buscando em todas as pastas (máximo 5 níveis de profundidade)...\n")
     
-    all_mpp_files = search_mpp_files_recursive(service, "", 0, 3)
+    all_mpp_files = search_mpp_files_recursive(service, "", 0, 5)
     
     # Mostra resultados
     print_section("📊 RESULTADOS DA BUSCA")
