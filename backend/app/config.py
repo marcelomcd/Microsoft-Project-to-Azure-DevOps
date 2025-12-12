@@ -1,7 +1,7 @@
 """Configurações do sistema usando Pydantic Settings para validação e segurança."""
 import os
 from typing import List
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -118,6 +118,25 @@ class Settings(BaseSettings):
         default=False,
         description="Se True, usa SharePoint como fonte de arquivos. Se False, usa MPP_FILES_DIR"
     )
+    
+    @field_validator('USE_SHAREPOINT', mode='before')
+    @classmethod
+    def parse_use_sharepoint(cls, v):
+        """Converte string para boolean, tratando valores inválidos como False"""
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            # Se for a string literal da variável não definida no Azure DevOps, retorna False
+            if v.startswith('$(') and v.endswith(')'):
+                return False
+            # Converte strings comuns para boolean
+            v_lower = v.strip().lower()
+            if v_lower in ('true', '1', 'yes', 'on'):
+                return True
+            if v_lower in ('false', '0', 'no', 'off', ''):
+                return False
+        # Se não conseguir converter, retorna False (padrão)
+        return False
 
 
 # Instância global de configurações
