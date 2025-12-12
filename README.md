@@ -16,7 +16,6 @@ Sistema completo para converter arquivos .mpp (Microsoft Project) em User Storie
 - **Interface moderna**: UI elegante com glassmorphism e temas claro/escuro
 - **Cache otimizado**: Sistema de cache para melhor performance
 - **Connection pooling**: Otimização de requisições HTTP
-- **Pipeline Azure DevOps**: Processamento automático agendado de arquivos .mpp do SharePoint
 
 ## 🛠️ Tecnologias Utilizadas
 
@@ -27,7 +26,6 @@ Sistema completo para converter arquivos .mpp (Microsoft Project) em User Storie
 - **Validação de dados**: Pydantic 2.10.0+
 - **HTTP Client**: Requests 2.32.0+ (com connection pooling)
 - **Parsing MPP**: MPXJ (via Java CLI)
-- **SharePoint Integration**: MSAL 1.24.0+ (autenticação OAuth 2.0)
 - **Ambiente**: Python Virtual Environment
 
 ### Frontend
@@ -73,56 +71,25 @@ npm install
 
 ## ⚙️ Configuração
 
-### Passo 1: Obter IDs do Azure AD
-
-Siga o guia completo em: **`GUIA_CONFIGURACAO_SHAREPOINT.md`**
-
-Resumo rápido:
-1. Acesse https://portal.azure.com → Azure Active Directory → App registrations
-2. Crie um novo registro de aplicativo
-3. Anote o **Application (client) ID** e **Directory (tenant) ID**
-4. Configure permissões: `Sites.Read.All` e `Files.Read.All`
-5. Conceda consentimento do administrador
-
-### Passo 2: Configurar Variáveis de Ambiente
-
 1. **Crie o arquivo `backend/.env`** com as seguintes variáveis:
 
 ```env
-# Azure DevOps
 AZURE_DEVOPS_ORG=qualiit
 AZURE_DEVOPS_PROJECT=Quali IT - Inovação e Tecnologia
 AZURE_DEVOPS_PAT=seu_token_aqui
-
-# Logging
 LOG_LEVEL=INFO
 API_TIMEOUT=30
-
-# SharePoint (para pipeline automática)
-SHAREPOINT_SITE_URL=https://qualiitcombr.sharepoint.com/sites/projetosqualiit
-SHAREPOINT_FOLDER_PATH=Documentos Compartilhados/Cronogramas - Project
-SHAREPOINT_CLIENT_ID=seu_client_id_aqui
-SHAREPOINT_CLIENT_SECRET=seu_client_secret_aqui
-SHAREPOINT_TENANT_ID=seu_tenant_id_aqui
 ```
 
 2. **Configure o PAT do Azure DevOps**:
    - Acesse: https://dev.azure.com/{org}/_usersSettings/tokens
    - Crie um token com permissões de "Work Items (Read & Write)"
 
-3. **Configure o App Registration no Azure AD (para monitoramento SharePoint)**:
-   - Acesse: https://portal.azure.com → Azure Active Directory → App registrations
-   - Crie um novo registro de aplicativo
-   - Anote o **Application (client) ID** e **Directory (tenant) ID**
-   - Em "Authentication", adicione uma plataforma "Mobile and desktop applications"
-   - Em "API permissions", adicione as permissões:
-     - `Microsoft Graph` → `Sites.Read.All` (Application)
-     - `Microsoft Graph` → `Files.Read.All` (Application)
-   - Configure as variáveis `SHAREPOINT_CLIENT_ID` e `SHAREPOINT_TENANT_ID` no `.env`
-
 ## 🚀 Execução
 
-### Método Rápido (Recomendado)
+### Execução Local (Desenvolvimento)
+
+#### Método Rápido (Recomendado)
 
 Execute o arquivo `INICIAR_SISTEMA.bat` na raiz do projeto:
 
@@ -142,9 +109,9 @@ Este script irá:
 - **Backend API:** http://127.0.0.1:8000
 - **Documentação Swagger:** http://127.0.0.1:8000/docs
 
-### Método Manual
+#### Método Manual
 
-#### Backend
+**Backend:**
 
 ```bash
 cd backend
@@ -152,12 +119,61 @@ venv\Scripts\activate
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-#### Frontend
+**Frontend:**
 
 ```bash
 cd frontend
 npm run dev
 ```
+
+### Execução Agendada (Pipeline Azure DevOps)
+
+O sistema suporta execução agendada via pipeline do Azure DevOps para processar arquivos .mpp automaticamente.
+
+#### Características
+
+- ✅ **Processamento Automático**: Executa diariamente às 6:00h (horário de Brasília)
+- ✅ **Processamento Inteligente**: Processa apenas arquivos novos ou modificados
+- ✅ **Histórico Persistente**: Mantém histórico de sincronização para evitar reprocessamento
+- ✅ **Logs Detalhados**: Gera logs completos de todas as operações
+- ✅ **Tratamento de Erros**: Continua processamento mesmo se alguns arquivos falharem
+
+#### Configuração Rápida
+
+1. **Configure a pipeline** no Azure DevOps (veja [PIPELINE_SETUP.md](PIPELINE_SETUP.md) para detalhes)
+2. **Configure variáveis de ambiente**:
+   - `AZURE_DEVOPS_PAT` (obrigatório, secreto)
+   - `MPP_FILES_DIR` (obrigatório - caminho do diretório de arquivos .mpp)
+   - `AZURE_DEVOPS_ORG` (opcional)
+   - `AZURE_DEVOPS_PROJECT` (opcional)
+3. **A pipeline executa automaticamente** todos os dias às 6:00h BRT
+
+#### Script de Sincronização
+
+Para executar manualmente ou em ambiente local:
+
+```bash
+cd backend
+python pipeline_sync.py
+```
+
+Ou usando o script refatorado:
+
+```bash
+cd backend
+python sync_all_mpp_files.py
+```
+
+**Variáveis de ambiente necessárias:**
+
+```bash
+export AZURE_DEVOPS_PAT="seu-pat-aqui"
+export MPP_FILES_DIR="/caminho/para/arquivos"
+export AZURE_DEVOPS_ORG="sua-org"
+export AZURE_DEVOPS_PROJECT="seu-projeto"
+```
+
+**Documentação completa:** Consulte [PIPELINE_SETUP.md](PIPELINE_SETUP.md) para instruções detalhadas de configuração, troubleshooting e boas práticas.
 
 ## 📖 Uso
 
@@ -169,91 +185,15 @@ npm run dev
 4. Verifique o projeto no Azure DevOps na aba "Azure DevOps User Stories and Task's"
 5. Sincronize os dados na aba "Sync .MPP → DevOps"
 
-### Processamento Automático via Pipeline do Azure DevOps
-
-O sistema processa automaticamente arquivos .mpp do SharePoint através de uma pipeline agendada no Azure DevOps.
-
-#### Como Funciona
-
-1. **Pipeline agendada**: Executa diariamente (ou conforme agendamento configurado)
-2. **Detecção inteligente**: Processa apenas arquivos modificados desde a última execução
-3. **Processamento automático**: Download, parse e conversão para Azure DevOps
-4. **Estado persistente**: Salva timestamp da execução para próxima verificação
-
-#### Configuração da Pipeline
-
-**Guia completo**: Veja `PIPELINE_SETUP.md` para instruções detalhadas.
-
-**Resumo:**
-1. Crie a pipeline no Azure DevOps usando `azure-pipelines.yml`
-2. Configure variáveis de ambiente (públicas e secretas)
-3. Configure agendamento (padrão: diariamente às 02:00 UTC)
-4. Pipeline executa automaticamente
-
-#### Variáveis Necessárias na Pipeline
-
-**Públicas:**
-- `SHAREPOINT_SITE_URL`
-- `SHAREPOINT_FOLDER_PATH` (pode ser vazio para raiz)
-- `SHAREPOINT_CLIENT_ID`
-- `SHAREPOINT_TENANT_ID`
-- `AZURE_DEVOPS_ORG`
-- `AZURE_DEVOPS_PROJECT`
-
-**Secretas (Keep this value secret):**
-- `SHAREPOINT_CLIENT_SECRET`
-- `AZURE_DEVOPS_PAT`
-
-#### Execução Manual (para testes)
-
-```bash
-cd backend
-venv\Scripts\activate
-python pipeline_main.py
-```
-
-O script:
-- Valida todas as configurações
-- Conecta ao SharePoint
-- Processa arquivos modificados desde última execução
-- Retorna exit code: 0 (sucesso) ou 1 (erro)
-
-#### Pontos Críticos
-
-1. **Java**: Pipeline precisa ter Java 11+ instalado (para parsing MPP)
-2. **Variáveis Secretas**: Configure como "Keep this value secret" no Azure DevOps
-3. **Timestamp**: Estado é salvo em `pipeline_state.json` (publicado como artefato)
-4. **Exit Codes**: Script retorna 0 (sucesso) ou 1 (erro) para pipeline detectar falhas
-5. **Logging**: Logs são capturados automaticamente pelo Azure DevOps
-
-#### Controle via API (Opcional)
-
-Endpoints disponíveis para monitoramento via API:
-
-- **`GET /api/v1/monitor/status`** - Status do monitoramento
-- **`POST /api/v1/monitor/check-now`** - Forçar verificação imediata
-- **`GET /api/v1/monitor/history`** - Histórico de processamentos
-- **`POST /api/v1/monitor/reset-state`** - Resetar estado
-- **`GET /api/v1/monitor/test-connection`** - Testar conexão com SharePoint
-
 ### Via API REST
 
 Acesse a documentação interativa: http://127.0.0.1:8000/docs
 
 **Principais endpoints:**
-
-**Upload e Conversão:**
 - `POST /api/v1/upload/` - Upload de arquivo .mpp
-- `POST /api/v1/convert/` - Converter arquivo para Azure DevOps
 - `GET /api/v1/workitems/{id}/analyze` - Analise Work Item completo
+- `POST /api/v1/convert/` - Converter arquivo para Azure DevOps
 - `GET /api/v1/projects/` - Listar projetos (Features)
-
-**Monitoramento SharePoint:**
-- `GET /api/v1/monitor/status` - Status do monitoramento
-- `POST /api/v1/monitor/check-now` - Forçar verificação imediata
-- `GET /api/v1/monitor/history` - Histórico de processamento
-- `POST /api/v1/monitor/reset-state` - Resetar estado
-- `GET /api/v1/monitor/test-connection` - Testar conexão com SharePoint
 
 ## 📁 Estrutura do Projeto
 
@@ -264,16 +204,14 @@ Acesse a documentação interativa: http://127.0.0.1:8000/docs
 │   │   ├── main.py              # Aplicação FastAPI
 │   │   ├── config.py            # Configurações (Pydantic Settings)
 │   │   ├── models/              # Modelos de dados (Pydantic)
-│   │   ├── services/            # Serviços (Parser, Mapper, DevOps Client, SharePoint)
+│   │   ├── services/            # Serviços (Parser, Mapper, DevOps Client, etc.)
 │   │   ├── routers/             # Endpoints da API
 │   │   └── utils/               # Utilitários (Cache, Validators)
-│   ├── pipeline_main.py         # Script principal para execução na pipeline
-│   ├── sharepoint_monitor.py    # Script de monitoramento (para uso via API)
 │   ├── lib/                     # Bibliotecas Java (MPXJ)
 │   ├── uploads/                 # Arquivos .mpp temporários
-│   ├── logs/                    # Logs do sistema
-│   ├── pipeline_state.json      # Estado da pipeline (timestamp última execução)
-│   ├── sharepoint_state.json    # Estado de arquivos processados (para uso via API)
+│   ├── logs/                    # Logs do sistema e histórico de sincronização
+│   ├── pipeline_sync.py         # Script principal para execução agendada
+│   ├── sync_all_mpp_files.py   # Script de sincronização (refatorado)
 │   ├── requirements.txt         # Dependências Python
 │   └── requirements-dev.txt     # Dependências de desenvolvimento
 ├── frontend/
@@ -282,8 +220,8 @@ Acesse a documentação interativa: http://127.0.0.1:8000/docs
 │   │   ├── services/            # Cliente API
 │   │   └── App.tsx             # Aplicação principal
 │   └── package.json            # Dependências Node.js
-├── azure-pipelines.yml          # Definição da pipeline do Azure DevOps
-├── PIPELINE_SETUP.md            # Guia completo de configuração da pipeline
+├── azure-pipelines.yml         # Definição da pipeline Azure DevOps
+├── PIPELINE_SETUP.md           # Documentação da pipeline
 ├── INICIAR_SISTEMA.bat         # Script de inicialização
 └── README.md                    # Este arquivo
 ```
@@ -297,14 +235,6 @@ Acesse a documentação interativa: http://127.0.0.1:8000/docs
 - **Hierarquia**: Tasks seguem a User Story anterior baseado na estrutura do arquivo
 
 ## 🔧 Funcionalidades Técnicas
-
-### Pipeline Azure DevOps
-- Execução agendada (configurável via cron)
-- Processamento baseado em timestamp (apenas arquivos modificados)
-- Estado persistente entre execuções
-- Exit codes apropriados para detecção de falhas
-- Logging estruturado para Azure DevOps
-- Publicação de artefatos (logs e estado)
 
 ### Cache
 - Cache de projetos (TTL: 60 minutos)
@@ -326,20 +256,10 @@ Acesse a documentação interativa: http://127.0.0.1:8000/docs
 
 ## 🐛 Troubleshooting
 
-### Problemas Gerais
 - **Frontend não funciona**: Instale Node.js de https://nodejs.org/
 - **Backend não inicia**: Verifique se porta 8000 está livre e se o PAT está configurado
 - **Erro ao processar .mpp**: Verifique se Java está instalado e no PATH
 - **Projetos não aparecem**: Verifique se o nome do projeto no .env está correto (com acentos)
-
-### Problemas na Pipeline
-- **Pipeline falha na autenticação**: Verifique se `SHAREPOINT_CLIENT_SECRET` está configurado como Secret Variable
-- **Java not found**: Pipeline precisa ter Java instalado (configurado no azure-pipelines.yml)
-- **Nenhum arquivo processado**: Verifique se há arquivos modificados desde última execução (veja pipeline_state.json)
-- **Erro 404 ao acessar pasta**: Verifique se `SHAREPOINT_FOLDER_PATH` está correto ou deixe vazio para raiz
-- **Timeout na pipeline**: Aumente `timeoutInMinutes` no azure-pipelines.yml
-
-Para mais detalhes, consulte `PIPELINE_SETUP.md`
 
 ## 📄 Licença
 

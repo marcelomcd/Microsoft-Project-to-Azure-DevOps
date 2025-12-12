@@ -1,0 +1,154 @@
+# Pipeline do Azure DevOps para sincronização agendada de arquivos .mpp
+# 
+# Esta pipeline:
+# - Executa diariamente às 6:00h (horário de Brasília = 9:00h UTC)
+# - Processa arquivos .mpp de um diretório configurado
+# - Sincroniza User Stories e Tasks com o Azure DevOps
+# - Gera logs detalhados e relatórios
+#
+# Variáveis necessárias (configurar em Library ou Pipeline Variables):
+# - AZURE_DEVOPS_PAT: Personal Access Token (configurar como secreto)
+# - MPP_FILES_DIR: Caminho do diretório onde os arquivos .mpp estão localizados
+# - AZURE_DEVOPS_ORG: Nome da organização (padrão: qualiit)
+# - AZURE_DEVOPS_PROJECT: Nome do projeto (padrão: Quali IT - Inovação e Tecnologia)
+
+trigger: none  # Pipeline não é acionada por commits
+
+schedules:
+  # Executa diariamente às 6:00h horário de Brasília (9:00h UTC)
+  # Nota: Azure DevOps usa UTC, então 6:00h BRT = 9:00h UTC
+  - cron: "0 9 * * *"  # 9:00h UTC = 6:00h BRT (horário padrão de Brasília)
+    displayName: Sincronização Diária - 6:00h BRT
+    branches:
+      include:
+        - main
+        - master
+    always: true  # Executa mesmo sem commits recentes
+
+pool:
+  vmImage: 'ubuntu-latest'  # Ou 'windows-latest' dependendo do ambiente
+
+variables:
+  - group: MPP_SYNC_VARIABLES  # Grupo de variáveis (opcional)
+  - name: PYTHON_VERSION
+    value: '3.9'
+  - name: JAVA_VERSION
+    value: '11'
+
+steps:
+  # Step 1: Checkout do código
+  - checkout: self
+    displayName: 'Checkout do código'
+    fetchDepth: 1
+
+  # Step 2: Setup Python
+  - task: UsePythonVersion@0
+    displayName: 'Configurar Python $(PYTHON_VERSION)'
+    inputs:
+      versionSpec: '$(PYTHON_VERSION)'
+      addToPath: true
+
+  # Step 3: Setup Java JDK
+  - task: JavaToolInstaller@0
+    displayName: 'Configurar Java JDK $(JAVA_VERSION)'
+    inputs:
+      versionSpec: '$(JAVA_VERSION)'
+      jdkArchitecture: 'x64'
+      jdkSourceOption: 'PreInstalled'
+
+  # Step 4: Instalar dependências Python
+  - script: |
+      cd backend
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+    displayName: 'Instalar dependências Python'
+    workingDirectory: '$(System.DefaultWorkingDirectory)'
+
+  # Step 5: Validar variáveis de ambiente obrigatórias
+  - script: |
+      if [ -z "$(AZURE_DEVOPS_PAT)" ]; then
+        echo "##vso[task.logissue type=error]AZURE_DEVOPS_PAT não está configurado"
+        exit 1
+      fi
+      
+      USE_SHAREPOINT=$(USE_SHAREPOINT)
+      if [ "$USE_SHAREPOINT" = "true" ] || [ "$USE_SHAREPOINT" = "True" ]; then
+        echo "Usando SharePoint como fonte de arquivos"
+        if [ -z "$(SHAREPOINT_CLIENT_ID)" ]; then
+          echo "##vso[task.logissue type=error]SHAREPOINT_CLIENT_ID não está configurado"
+          exit 1
+        fi
+        if [ -z "$(SHAREPOINT_CLIENT_SECRET)" ]; then
+          echo "##vso[task.logissue type=error]SHAREPOINT_CLIENT_SECRET não está configurado"
+          exit 1
+        fi
+        if [ -z "$(SHAREPOINT_TENANT_ID)" ]; then
+          echo "##vso[task.logissue type=error]SHAREPOINT_TENANT_ID não está configurado"
+          exit 1
+        fi
+        if [ -z "$(SHAREPOINT_SITE_URL)" ]; then
+          echo "##vso[task.logissue type=error]SHAREPOINT_SITE_URL não está configurado"
+          exit 1
+        fi
+      else
+        echo "Usando diretório local como fonte de arquivos"
+        if [ -z "$(MPP_FILES_DIR)" ]; then
+          echo "##vso[task.logissue type=error]MPP_FILES_DIR não está configurado (ou configure USE_SHAREPOINT=True)"
+          exit 1
+        fi
+      fi
+      
+      echo "Variáveis de ambiente validadas"
+      echo "USE_SHAREPOINT: $(USE_SHAREPOINT)"
+      echo "AZURE_DEVOPS_ORG: $(AZURE_DEVOPS_ORG)"
+      echo "AZURE_DEVOPS_PROJECT: $(AZURE_DEVOPS_PROJECT)"
+    displayName: 'Validar variáveis de ambiente'
+    env:
+      AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT)
+      USE_SHAREPOINT: $(USE_SHAREPOINT)
+      SHAREPOINT_CLIENT_ID: $(SHAREPOINT_CLIENT_ID)
+      SHAREPOINT_CLIENT_SECRET: $(SHAREPOINT_CLIENT_SECRET)
+      SHAREPOINT_TENANT_ID: $(SHAREPOINT_TENANT_ID)
+      SHAREPOINT_SITE_URL: $(SHAREPOINT_SITE_URL)
+      SHAREPOINT_FOLDER_PATH: $(SHAREPOINT_FOLDER_PATH)
+      MPP_FILES_DIR: $(MPP_FILES_DIR)
+      AZURE_DEVOPS_ORG: $(AZURE_DEVOPS_ORG)
+      AZURE_DEVOPS_PROJECT: $(AZURE_DEVOPS_PROJECT)
+
+  # Step 6: Executar script de sincronização
+  - script: |
+      cd backend
+      python pipeline_sync.py
+    displayName: 'Executar sincronização de arquivos .mpp'
+    env:
+      AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT)
+      USE_SHAREPOINT: $(USE_SHAREPOINT)
+      SHAREPOINT_CLIENT_ID: $(SHAREPOINT_CLIENT_ID)
+      SHAREPOINT_CLIENT_SECRET: $(SHAREPOINT_CLIENT_SECRET)
+      SHAREPOINT_TENANT_ID: $(SHAREPOINT_TENANT_ID)
+      SHAREPOINT_SITE_URL: $(SHAREPOINT_SITE_URL)
+      SHAREPOINT_FOLDER_PATH: $(SHAREPOINT_FOLDER_PATH)
+      MPP_FILES_DIR: $(MPP_FILES_DIR)
+      AZURE_DEVOPS_ORG: $(AZURE_DEVOPS_ORG)
+      AZURE_DEVOPS_PROJECT: $(AZURE_DEVOPS_PROJECT)
+      LOG_LEVEL: $(LOG_LEVEL)
+    continueOnError: false  # Falha na pipeline se script falhar
+
+  # Step 7: Publicar logs como artefatos
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publicar logs de sincronização'
+    inputs:
+      pathToPublish: 'backend/logs'
+      artifactName: 'sync_logs'
+      publishLocation: 'Container'
+    condition: always()  # Publica mesmo se pipeline falhar
+
+  # Step 8: Publicar resumo (opcional)
+  - script: |
+      echo "##vso[task.complete result=Succeeded;]Sincronização concluída"
+      if [ -f "backend/logs/sync_history.json" ]; then
+        echo "##vso[task.addattachment type=file;name=sync_history;]backend/logs/sync_history.json"
+      fi
+    displayName: 'Publicar resumo'
+    condition: always()
+

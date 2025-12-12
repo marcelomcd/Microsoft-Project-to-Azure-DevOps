@@ -10,12 +10,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -25,11 +19,13 @@ venv/
 env/
 ENV/
 .venv
+backend/venv/
 
 # Environment Variables
 .env
 .env.local
 .env.*.local
+backend/.env
 
 # IDEs
 .vscode/
@@ -38,17 +34,19 @@ ENV/
 *.sublime-workspace
 .DS_Store
 
-# Logs
+# Logs (manter diretório, ignorar arquivos)
+backend/logs/*.json
+backend/logs/*.txt
 *.log
-logs/
 *.log.*
 
-# Uploads
+# Uploads e arquivos temporários
 backend/uploads/
+uploads/
 *.mpp
 *.csv
 
-# Node
+# Node (caso ainda exista)
 node_modules/
 npm-debug.log*
 yarn-debug.log*
