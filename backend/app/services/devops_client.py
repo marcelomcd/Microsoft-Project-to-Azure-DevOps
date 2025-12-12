@@ -371,7 +371,9 @@ class AzureDevOpsClient:
         """
         try:
             # Constrói query WIQL
-            query_parts = [f"[System.Title] = '{title.replace(\"'\", \"''\")}'"]
+            # Escapa aspas simples no título (substitui ' por '')
+            escaped_title = title.replace("'", "''")
+            query_parts = [f"[System.Title] = '{escaped_title}'"]
             
             if work_item_type:
                 query_parts.append(f"[System.WorkItemType] = '{work_item_type}'")
