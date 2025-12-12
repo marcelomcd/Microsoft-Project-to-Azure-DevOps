@@ -252,10 +252,15 @@ def main():
     
     if not all_mpp_files:
         print("❌ Nenhum arquivo .mpp encontrado em nenhuma pasta")
-        print("\n💡 Verifique:")
-        print("   1. Se há arquivos .mpp no SharePoint")
-        print("   2. Se as permissões do App Registration estão corretas")
-        print("   3. Se o caminho do site está correto")
+        print("\n💡 Possíveis causas:")
+        print("   1. Os arquivos .mpp estão em uma subpasta mais profunda (busca até 5 níveis)")
+        print("   2. Os arquivos estão em uma biblioteca de documentos diferente")
+        print("   3. As permissões do App Registration não permitem ver os arquivos")
+        print("   4. O caminho do site está incorreto")
+        print("\n🔍 Próximos passos:")
+        print("   1. Verifique manualmente no SharePoint onde estão os arquivos .mpp")
+        print("   2. Use o caminho completo da pasta na variável SHAREPOINT_FOLDER_PATH")
+        print("   3. Exemplo: Se os arquivos estão em 'Quali IT/Projetos/MPP', use esse caminho")
         return 1
     
     # Agrupa por pasta
