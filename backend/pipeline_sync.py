@@ -420,39 +420,62 @@ def main() -> int:
         logger.error("Validação de ambiente falhou. Encerrando.")
         return 1
     
-    # Valida diretório de arquivos
-    mpp_files_dir = Path(settings.MPP_FILES_DIR)
-    if not mpp_files_dir.exists():
-        logger.error(f"Diretório de arquivos não existe: {mpp_files_dir}")
-        logger.error("Configure MPP_FILES_DIR corretamente na pipeline ou variáveis de ambiente")
-        return 1
-    
-    if not mpp_files_dir.is_dir():
-        logger.error(f"MPP_FILES_DIR não é um diretório: {mpp_files_dir}")
-        return 1
-    
     # Inicializa serviços
     logger.info("Inicializando serviços...")
     try:
         history_service = SyncHistoryService()
         devops_client = AzureDevOpsClient()
         file_processor = FileProcessor(devops_client=devops_client)
+        
+        # Inicializa SharePoint se necessário
+        sharepoint_service = None
+        if settings.USE_SHAREPOINT:
+            sharepoint_service = SharePointFileService()
+        
         logger.info("Serviços inicializados com sucesso")
     except Exception as e:
         logger.exception(f"Erro ao inicializar serviços: {e}")
         return 1
     
-    # Encontra arquivos .mpp
-    logger.info(f"Buscando arquivos .mpp no diretório: {mpp_files_dir}")
-    mpp_files = find_mpp_files(mpp_files_dir)
-    
-    if not mpp_files:
-        logger.warning("Nenhum arquivo .mpp encontrado no diretório especificado")
-        return 0  # Não é erro se não há arquivos
-    
-    # Processa arquivos
-    logger.info(f"Iniciando processamento de {len(mpp_files)} arquivo(s)")
-    results = process_files(mpp_files, history_service, file_processor)
+    # Encontra e processa arquivos .mpp
+    if settings.USE_SHAREPOINT:
+        # Usa SharePoint como fonte
+        logger.info("Buscando arquivos .mpp no SharePoint...")
+        try:
+            files = find_mpp_files_sharepoint(sharepoint_service)
+            
+            if not files:
+                logger.warning("Nenhum arquivo .mpp encontrado no SharePoint")
+                return 0  # Não é erro se não há arquivos
+            
+            # Processa arquivos do SharePoint
+            logger.info(f"Iniciando processamento de {len(files)} arquivo(s) do SharePoint")
+            results = process_files_sharepoint(files, history_service, file_processor, sharepoint_service)
+        except Exception as e:
+            logger.exception(f"Erro ao processar arquivos do SharePoint: {e}")
+            return 1
+    else:
+        # Usa diretório local como fonte
+        mpp_files_dir = Path(settings.MPP_FILES_DIR)
+        if not mpp_files_dir.exists():
+            logger.error(f"Diretório de arquivos não existe: {mpp_files_dir}")
+            logger.error("Configure MPP_FILES_DIR corretamente na pipeline ou variáveis de ambiente")
+            return 1
+        
+        if not mpp_files_dir.is_dir():
+            logger.error(f"MPP_FILES_DIR não é um diretório: {mpp_files_dir}")
+            return 1
+        
+        logger.info(f"Buscando arquivos .mpp no diretório: {mpp_files_dir}")
+        mpp_files = find_mpp_files_local(mpp_files_dir)
+        
+        if not mpp_files:
+            logger.warning("Nenhum arquivo .mpp encontrado no diretório especificado")
+            return 0  # Não é erro se não há arquivos
+        
+        # Processa arquivos locais
+        logger.info(f"Iniciando processamento de {len(mpp_files)} arquivo(s)")
+        results = process_files_local(mpp_files, history_service, file_processor)
     
     # Imprime resumo
     print_summary(results)
