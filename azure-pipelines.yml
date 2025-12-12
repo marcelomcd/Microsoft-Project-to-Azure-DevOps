@@ -30,7 +30,9 @@ pool:
   vmImage: 'ubuntu-latest'  # Ou 'windows-latest' dependendo do ambiente
 
 variables:
-  - group: MPP_SYNC_VARIABLES  # Grupo de variáveis (opcional)
+  # Variáveis podem ser configuradas diretamente na pipeline ou via Pipeline Variables
+  # Para usar grupo de variáveis, descomente a linha abaixo e crie o grupo MPP_SYNC_VARIABLES
+  # - group: MPP_SYNC_VARIABLES  # Grupo de variáveis (opcional)
   - name: PYTHON_VERSION
     value: '3.9'
   - name: JAVA_VERSION
