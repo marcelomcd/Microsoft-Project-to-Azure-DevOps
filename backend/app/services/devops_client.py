@@ -371,7 +371,7 @@ class AzureDevOpsClient:
         """
         try:
             # Constrói query WIQL
-            query_parts = [f"[System.Title] = '{title.replace("'", "''")}'"]
+            query_parts = [f"[System.Title] = '{title.replace(\"'\", \"''\")}'"]
             
             if work_item_type:
                 query_parts.append(f"[System.WorkItemType] = '{work_item_type}'")
