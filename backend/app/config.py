@@ -78,6 +78,38 @@ class Settings(BaseSettings):
         default=30,
         description="Timeout padrão para requisições à API (segundos)"
     )
+    
+    # SharePoint
+    SHAREPOINT_SITE_URL: str = Field(
+        default="",
+        description="URL do site do SharePoint (ex: https://qualiitcombr.sharepoint.com/sites/projetosqualiit)"
+    )
+    SHAREPOINT_FOLDER_PATH: str = Field(
+        default="Documentos Compartilhados/Cronogramas - Project",
+        description="Caminho da pasta dentro do site do SharePoint"
+    )
+    SHAREPOINT_CLIENT_ID: str = Field(
+        default="",
+        description="Client ID do App Registration no Azure AD"
+    )
+    SHAREPOINT_CLIENT_SECRET: str = Field(
+        default="",
+        description="Client Secret do App Registration (opcional, se usar app registration)"
+    )
+    SHAREPOINT_TENANT_ID: str = Field(
+        default="",
+        description="Tenant ID do Azure AD"
+    )
+    SHAREPOINT_AUTHORITY: str = Field(
+        default="https://login.microsoftonline.com",
+        description="URL base de autoridade do Azure AD"
+    )
+    
+    # Pipeline
+    LAST_RUN_TIMESTAMP_FILE: str = Field(
+        default="pipeline_state.json",
+        description="Arquivo para armazenar timestamp da última execução da pipeline"
+    )
 
 
 # Instância global de configurações
