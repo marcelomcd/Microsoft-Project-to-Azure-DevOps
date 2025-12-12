@@ -1,8 +1,8 @@
 # Pipeline do Azure DevOps para sincronização agendada de arquivos .mpp
 # 
 # Esta pipeline:
-# - Executa diariamente às 6:00h (horário de Brasília = 9:00h UTC)
-# - Processa arquivos .mpp de um diretório configurado
+# - Executa de segunda a sexta-feira às 6:30h (horário de Brasília = 9:30h UTC)
+# - Processa arquivos .mpp de um diretório configurado ou SharePoint
 # - Sincroniza User Stories e Tasks com o Azure DevOps
 # - Gera logs detalhados e relatórios
 #
@@ -15,10 +15,11 @@
 trigger: none  # Pipeline não é acionada por commits
 
 schedules:
-  # Executa diariamente às 6:00h horário de Brasília (9:00h UTC)
-  # Nota: Azure DevOps usa UTC, então 6:00h BRT = 9:00h UTC
-  - cron: "0 9 * * *"  # 9:00h UTC = 6:00h BRT (horário padrão de Brasília)
-    displayName: Sincronização Diária - 6:00h BRT
+  # Executa de segunda a sexta-feira às 6:30h horário de Brasília (9:30h UTC)
+  # Nota: Azure DevOps usa UTC, então 6:30h BRT = 9:30h UTC
+  # Formato cron: minuto hora dia mês dia_da_semana (1=segunda, 5=sexta)
+  - cron: "30 9 * * 1-5"  # 9:30h UTC = 6:30h BRT, segunda a sexta-feira
+    displayName: Sincronização - Segunda a Sexta às 6:30h BRT
     branches:
       include:
         - main
