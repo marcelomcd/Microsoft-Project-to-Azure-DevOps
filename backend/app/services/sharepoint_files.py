@@ -114,15 +114,16 @@ class SharePointFileService:
                 logger.error(f"Resposta: {e.response.text}")
             raise ValueError(f"Falha ao obter Site ID do SharePoint: {e}")
     
-    def _get_drive_id(self, site_id: str) -> str:
+    def _get_drive_id(self, site_id: str, return_all: bool = False) -> str | List[Dict[str, Any]]:
         """
         Obtém o Drive ID (document library) do SharePoint.
         
         Args:
             site_id: Site ID do SharePoint
+            return_all: Se True, retorna lista de todos os drives. Se False, retorna apenas o ID do drive "Documentos Compartilhados" ou o primeiro disponível.
             
         Returns:
-            Drive ID
+            Drive ID (string) ou lista de drives (dict) se return_all=True
             
         Raises:
             ValueError: Se não conseguir obter Drive ID
@@ -147,13 +148,27 @@ class SharePointFileService:
             if not drives:
                 raise ValueError("Nenhum drive encontrado no site")
             
-            # Usa o primeiro drive (geralmente "Documentos" ou "Documentos Compartilhados")
+            # Se return_all=True, retorna todos os drives
+            if return_all:
+                return drives
+            
+            # Tenta encontrar "Documentos Compartilhados" primeiro
+            for drive in drives:
+                drive_name = drive.get("name", "")
+                if "Documentos Compartilhados" in drive_name or "Shared Documents" in drive_name:
+                    drive_id = drive.get("id")
+                    if drive_id:
+                        logger.debug(f"Drive ID obtido (Documentos Compartilhados): {drive_id}")
+                        return drive_id
+            
+            # Se não encontrou, usa o primeiro drive disponível
             drive_id = drives[0].get("id")
             
             if not drive_id:
                 raise ValueError("Drive ID não encontrado")
             
-            logger.debug(f"Drive ID obtido: {drive_id}")
+            drive_name = drives[0].get("name", "Desconhecido")
+            logger.debug(f"Drive ID obtido ({drive_name}): {drive_id}")
             return drive_id
         except requests.exceptions.RequestException as e:
             logger.error(f"Erro ao obter Drive ID: {e}")
@@ -223,7 +238,11 @@ class SharePointFileService:
             folder_id = self._get_folder_id(drive_id, self.folder_path)
             
             if not folder_id:
-                logger.warning(f"Pasta não encontrada: {self.folder_path}. Tentando pasta raiz.")
+                logger.warning(f"Pasta não encontrada: {self.folder_path}. Tentando variações do caminho.")
+                
+                # Obtém access_token para debug
+                access_token = self.auth_service.get_access_token()
+                
                 # Tenta listar pastas disponíveis na raiz para debug
                 try:
                     debug_url = f"{self.graph_base_url}/drives/{drive_id}/root/children"
@@ -251,13 +270,28 @@ class SharePointFileService:
                     logger.warning(f"Erro ao listar pastas para debug: {e}")
                 
                 # Tenta variações do caminho
+                # Se o caminho original inclui "Documentos Compartilhados/", tenta sem essa parte também
+                folder_path_clean = self.folder_path
+                if folder_path_clean.startswith("Documentos Compartilhados/"):
+                    folder_path_clean = folder_path_clean.replace("Documentos Compartilhados/", "", 1)
+                
                 folder_variations = [
+                    self.folder_path,  # Caminho original completo
+                    folder_path_clean,  # Sem "Documentos Compartilhados/" se estava presente
                     "Cronogramas - Project",  # Apenas subpasta
                     "Cronogramas-Project",    # Sem espaços
                     "CronogramasProject",     # Sem espaços e hífen
                 ]
                 
-                for variation in folder_variations:
+                # Remove duplicatas mantendo ordem
+                seen = set()
+                unique_variations = []
+                for var in folder_variations:
+                    if var and var not in seen:
+                        seen.add(var)
+                        unique_variations.append(var)
+                
+                for variation in unique_variations:
                     logger.info(f"Tentando caminho alternativo: {variation}")
                     folder_id = self._get_folder_id(drive_id, variation)
                     if folder_id:
@@ -265,8 +299,8 @@ class SharePointFileService:
                         break
                 
                 if not folder_id:
-                    logger.warning("Nenhuma variação do caminho funcionou. Usando pasta raiz.")
-                    folder_id = "root"
+                    logger.error(f"❌ Nenhuma variação do caminho funcionou. Verifique o caminho: {self.folder_path}")
+                    return []  # Retorna vazio se nenhuma pasta for encontrada
             
             # Lista arquivos na pasta
             access_token = self.auth_service.get_access_token()

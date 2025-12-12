@@ -1,138 +1,74 @@
-# Configuração do SharePoint para Pipeline
+# 📋 Configuração do SharePoint na Pipeline
 
-Este guia explica como configurar o SharePoint como fonte de arquivos .mpp na pipeline.
+## ✅ Caminho Correto da Pasta
 
-## 📋 Informações do SharePoint
+Com base nas informações fornecidas, o caminho correto da pasta no SharePoint é:
 
-Com base nos links fornecidos, as informações do SharePoint são:
+```
+Documentos Compartilhados/Cronogramas - Project
+```
 
-- **Site URL**: `https://qualiitcombr.sharepoint.com/sites/projetosqualiit`
-- **Pasta**: `Documentos Compartilhados/Cronogramas - Project`
+## 🔧 Variáveis a Configurar na Pipeline
 
-## ⚙️ Configuração na Pipeline
+Configure as seguintes variáveis na pipeline do Azure DevOps:
 
-### Passo 1: Configurar Variáveis na Pipeline
+### Variáveis Obrigatórias:
 
-1. Vá em **Pipelines** → **Pipelines** → [Sua Pipeline] → **Edit** → **Variables**
+1. **`USE_SHAREPOINT`**
+   - Valor: `true`
+   - Tipo: String (será convertido para boolean automaticamente)
 
-2. Configure as seguintes variáveis:
+2. **`SHAREPOINT_SITE_URL`**
+   - Valor: `https://qualiitcombr.sharepoint.com/sites/projetosqualiit`
+   - Tipo: String
+   - Nota: Use `qualiitcombr.sharepoint.com` (não `qualiitcombr-my.sharepoint.com`)
 
-#### Variável 1: USE_SHAREPOINT
-- **Name**: `USE_SHAREPOINT`
-- **Value**: `True`
-- **Keep this value secret**: ❌ Não
-- Clique em **OK**
+3. **`SHAREPOINT_FOLDER_PATH`**
+   - Valor: `Documentos Compartilhados/Cronogramas - Project`
+   - Tipo: String
+   - Nota: Este é o caminho completo dentro da biblioteca de documentos
 
-#### Variável 2: SHAREPOINT_SITE_URL
-- **Name**: `SHAREPOINT_SITE_URL`
-- **Value**: `https://qualiitcombr.sharepoint.com/sites/projetosqualiit`
-- **Keep this value secret**: ❌ Não
-- Clique em **OK**
+4. **`SHAREPOINT_CLIENT_ID`**
+   - Valor: (seu Client ID do App Registration)
+   - Tipo: Secret (marque como secreto)
 
-#### Variável 3: SHAREPOINT_FOLDER_PATH
-- **Name**: `SHAREPOINT_FOLDER_PATH`
-- **Value**: `Documentos Compartilhados/Cronogramas - Project`
-- **Keep this value secret**: ❌ Não
-- Clique em **OK**
+5. **`SHAREPOINT_CLIENT_SECRET`**
+   - Valor: (seu Client Secret do App Registration)
+   - Tipo: Secret (marque como secreto)
 
-#### Variável 4: SHAREPOINT_CLIENT_ID
-- **Name**: `SHAREPOINT_CLIENT_ID`
-- **Value**: Seu Client ID do Microsoft Entra ID (Application ID)
-- **Keep this value secret**: ❌ Não
-- Clique em **OK**
+6. **`SHAREPOINT_TENANT_ID`**
+   - Valor: (seu Tenant ID do Microsoft Entra ID)
+   - Tipo: Secret (marque como secreto)
 
-#### Variável 5: SHAREPOINT_CLIENT_SECRET
-- **Name**: `SHAREPOINT_CLIENT_SECRET`
-- **Value**: Seu Client Secret do Microsoft Entra ID
-- **Keep this value secret**: ✅ **SIM** (marcar como secreto!)
-- Clique em **OK**
+## 📝 Como Configurar na Pipeline
 
-#### Variável 6: SHAREPOINT_TENANT_ID
-- **Name**: `SHAREPOINT_TENANT_ID`
-- **Value**: Seu Tenant ID (Directory ID) do Microsoft Entra ID
-- **Keep this value secret**: ❌ Não
-- Clique em **OK**
+1. Acesse a pipeline no Azure DevOps
+2. Vá em **Edit** → **Variables**
+3. Adicione cada variável acima
+4. Para variáveis secretas (Client ID, Client Secret, Tenant ID):
+   - Marque a opção **"Keep this value secret"**
+   - Clique em **Save**
 
-### Passo 2: Remover ou Deixar Vazio MPP_FILES_DIR
+## 🔍 Verificação
 
-Se você configurou `USE_SHAREPOINT=True`, não precisa configurar `MPP_FILES_DIR`. Você pode:
-- Deixar a variável vazia, ou
-- Remover a variável da pipeline
+Após configurar, execute a pipeline e verifique os logs:
 
-### Passo 3: Salvar e Testar
+- ✅ Se encontrar a pasta, verá: `✅ Pasta encontrada com caminho: Documentos Compartilhados/Cronogramas - Project`
+- ✅ Se encontrar arquivos .mpp, verá: `📄 Encontrados X arquivo(s) .mpp`
 
-1. Clique em **Save** (canto superior direito)
-2. Execute a pipeline manualmente para testar
-3. Verifique os logs para confirmar que está acessando o SharePoint corretamente
+## ⚠️ Troubleshooting
 
-## 🔐 Como Obter as Credenciais do SharePoint
+Se a pasta não for encontrada, o código tentará automaticamente estas variações:
 
-### Client ID, Client Secret e Tenant ID
+1. `Documentos Compartilhados/Cronogramas - Project` (caminho original)
+2. `Cronogramas - Project` (sem "Documentos Compartilhados/")
+3. `Cronogramas-Project` (sem espaços)
+4. `CronogramasProject` (sem espaços e hífen)
 
-Essas informações vêm de um **App Registration** no Microsoft Entra ID (Azure AD):
+Os logs mostrarão qual variação funcionou.
 
-1. Acesse: https://portal.azure.com
-2. Vá em **Microsoft Entra ID** → **App registrations**
-3. Selecione seu app (ou crie um novo)
-4. **Client ID (Application ID)**: Encontrado na página **Overview**
-5. **Tenant ID (Directory ID)**: Encontrado na página **Overview**
-6. **Client Secret**: Vá em **Certificates & secrets** → **New client secret**
+## 📌 Notas Importantes
 
-### Permissões Necessárias
-
-O app precisa ter as seguintes permissões no Microsoft Graph API:
-- `Sites.Read.All` (Application permission)
-- `Files.Read.All` (Application permission)
-
-Para configurar:
-1. Vá em **API permissions**
-2. Clique em **Add a permission**
-3. Selecione **Microsoft Graph**
-4. Selecione **Application permissions**
-5. Adicione `Sites.Read.All` e `Files.Read.All`
-6. Clique em **Grant admin consent**
-
-## ✅ Checklist de Configuração
-
-- [ ] `USE_SHAREPOINT` configurado como `True`
-- [ ] `SHAREPOINT_SITE_URL` configurado corretamente
-- [ ] `SHAREPOINT_FOLDER_PATH` configurado corretamente
-- [ ] `SHAREPOINT_CLIENT_ID` configurado
-- [ ] `SHAREPOINT_CLIENT_SECRET` configurado (como secreto)
-- [ ] `SHAREPOINT_TENANT_ID` configurado
-- [ ] Permissões do app configuradas no Microsoft Entra ID
-- [ ] Pipeline testada e funcionando
-
-## 🐛 Troubleshooting
-
-### Erro: "SHAREPOINT_SITE_URL não está configurado"
-
-**Solução**: Verifique se a variável `SHAREPOINT_SITE_URL` está configurada na pipeline.
-
-### Erro: "Erro de autenticação"
-
-**Solução**: 
-- Verifique se `SHAREPOINT_CLIENT_ID`, `SHAREPOINT_CLIENT_SECRET` e `SHAREPOINT_TENANT_ID` estão corretos
-- Verifique se o Client Secret não expirou
-- Verifique se as permissões foram concedidas no Microsoft Entra ID
-
-### Erro: "Pasta não encontrada"
-
-**Solução**: 
-- Verifique se `SHAREPOINT_FOLDER_PATH` está correto
-- O caminho deve ser relativo ao site, ex: `Documentos Compartilhados/Cronogramas - Project`
-- Não inclua o nome do site no caminho
-
-### Erro: "Acesso negado"
-
-**Solução**: 
-- Verifique se o app tem as permissões necessárias
-- Verifique se o admin consent foi concedido
-- Verifique se o app tem acesso ao site SharePoint
-
-## 📚 Referências
-
-- [Microsoft Graph API - Sites](https://learn.microsoft.com/en-us/graph/api/resources/site)
-- [Microsoft Graph API - Files](https://learn.microsoft.com/en-us/graph/api/resources/driveitem)
-- [Azure AD App Registration](https://learn.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app)
-
+- O código busca automaticamente a biblioteca "Documentos Compartilhados" primeiro
+- Se não encontrar, usa a primeira biblioteca disponível
+- O caminho é case-sensitive, então use exatamente: `Cronogramas - Project` (com espaço e hífen)
