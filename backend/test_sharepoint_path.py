@@ -218,17 +218,26 @@ def main():
     print_section("📚 BIBLIOTECAS DE DOCUMENTOS DISPONÍVEIS")
     try:
         site_id = service._get_site_id()
-        drives = service._get_drive_id(site_id, return_all=True)
+        access_token = service.auth_service.get_access_token()
+        url = f"{service.graph_base_url}/sites/{site_id}/drives"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json"
+        }
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+        drives_data = response.json()
+        drives = drives_data.get("value", [])
         
-        if isinstance(drives, list) and len(drives) > 1:
+        if len(drives) > 1:
             print(f"✅ Encontradas {len(drives)} biblioteca(s) de documentos:\n")
             for i, drive in enumerate(drives, 1):
                 drive_name = drive.get("name", "Sem nome")
-                drive_id = drive.get("id", "")
-                print(f"   {i}. {drive_name} (ID: {drive_id[:20]}...)")
-            print("\n💡 Tentando buscar arquivos .mpp em todas as bibliotecas...\n")
+                print(f"   {i}. {drive_name}")
+            print("\n💡 Usando a primeira biblioteca (padrão). Se os arquivos estiverem em outra, será necessário ajustar o código.\n")
         else:
-            print("✅ Usando biblioteca de documentos padrão\n")
+            drive_name = drives[0].get("name", "Biblioteca padrão") if drives else "N/A"
+            print(f"✅ Biblioteca de documentos: {drive_name}\n")
     except Exception as e:
         print(f"⚠️  Não foi possível listar bibliotecas: {e}\n")
     
