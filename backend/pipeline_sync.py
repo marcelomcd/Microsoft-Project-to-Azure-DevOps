@@ -456,10 +456,25 @@ def main() -> int:
             return 1
     else:
         # Usa diretório local como fonte
-        mpp_files_dir = Path(settings.MPP_FILES_DIR)
+        mpp_files_dir_str = settings.MPP_FILES_DIR
+        
+        # Detecta se MPP_FILES_DIR é uma URL (SharePoint)
+        if mpp_files_dir_str and (mpp_files_dir_str.startswith('http://') or mpp_files_dir_str.startswith('https://')):
+            logger.warning(f"MPP_FILES_DIR parece ser uma URL do SharePoint: {mpp_files_dir_str}")
+            logger.warning("Configure USE_SHAREPOINT=True e as variáveis do SharePoint para usar SharePoint")
+            logger.warning("Ou configure MPP_FILES_DIR com um caminho de diretório local válido")
+            return 1
+        
+        if not mpp_files_dir_str:
+            logger.error("MPP_FILES_DIR não está configurado")
+            logger.error("Configure MPP_FILES_DIR com um caminho de diretório local ou configure USE_SHAREPOINT=True para usar SharePoint")
+            return 1
+        
+        mpp_files_dir = Path(mpp_files_dir_str)
         if not mpp_files_dir.exists():
             logger.error(f"Diretório de arquivos não existe: {mpp_files_dir}")
             logger.error("Configure MPP_FILES_DIR corretamente na pipeline ou variáveis de ambiente")
+            logger.error("Ou configure USE_SHAREPOINT=True e as variáveis do SharePoint para usar SharePoint")
             return 1
         
         if not mpp_files_dir.is_dir():
