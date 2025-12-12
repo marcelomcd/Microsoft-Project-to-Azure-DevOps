@@ -224,6 +224,23 @@ class SharePointFileService:
             
             if not folder_id:
                 logger.warning(f"Pasta não encontrada: {self.folder_path}. Tentando pasta raiz.")
+                # Tenta listar pastas disponíveis na raiz para debug
+                try:
+                    debug_url = f"{self.graph_base_url}/drives/{drive_id}/root/children"
+                    debug_response = requests.get(
+                        debug_url,
+                        headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+                        params={"$filter": "folder ne null", "$select": "name,id"},
+                        timeout=30
+                    )
+                    if debug_response.status_code == 200:
+                        debug_data = debug_response.json()
+                        folders = debug_data.get("value", [])
+                        if folders:
+                            folder_names = [f.get("name", "") for f in folders]
+                            logger.info(f"Pastas disponíveis na raiz: {', '.join(folder_names)}")
+                except Exception as e:
+                    logger.debug(f"Erro ao listar pastas para debug: {e}")
                 folder_id = "root"
             
             # Lista arquivos na pasta
