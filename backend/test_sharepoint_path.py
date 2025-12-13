@@ -224,12 +224,85 @@ def main():
         "Documentos+Compartilhados/Cronogramas+-+Project",
     ]
     
+    # Tenta acessar pasta pelo ID do link de compartilhamento fornecido
+    # Link: https://qualiitcombr.sharepoint.com/:f:/s/projetosqualiit/IgDfseI1JwFTS4k2qmjtTgjzAecCJkLXi97Zq_8UWhHYkWM?e=MoVFeZ
+    # O ID da pasta parece ser: IgDfseI1JwFTS4k2qmjtTgjzAecCJkLXi97Zq_8UWhHYkWM
+    folder_id_from_link = "IgDfseI1JwFTS4k2qmjtTgjzAecCJkLXi97Zq_8UWhHYkWM"
+    
     # Adiciona o caminho configurado se existir
     if settings.SHAREPOINT_FOLDER_PATH and settings.SHAREPOINT_FOLDER_PATH not in test_paths:
         test_paths.insert(0, settings.SHAREPOINT_FOLDER_PATH)
     
     site_id = service._get_site_id()
     drive_id = service._get_drive_id(site_id)
+    
+    # Primeiro, tenta acessar diretamente pelo ID do link de compartilhamento
+    print("🔗 Testando acesso direto pelo ID do link de compartilhamento...")
+    try:
+        access_token = service.auth_service.get_access_token()
+        # Tenta acessar a pasta diretamente pelo ID
+        direct_url = f"{service.graph_base_url}/drives/{drive_id}/items/{folder_id_from_link}"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json"
+        }
+        response = requests.get(direct_url, headers=headers, timeout=30)
+        
+        if response.status_code == 200:
+            folder_data = response.json()
+            folder_name = folder_data.get("name", "Desconhecida")
+            folder_path_from_id = folder_data.get("parentReference", {}).get("path", "")
+            print(f"   ✅ Pasta encontrada pelo ID: {folder_name}")
+            print(f"   📁 Caminho: {folder_path_from_id}")
+            
+            # Lista arquivos nesta pasta
+            children_url = f"{service.graph_base_url}/drives/{drive_id}/items/{folder_id_from_link}/children"
+            children_response = requests.get(children_url, headers=headers, params={"$select": "id,name,size,lastModifiedDateTime,webUrl,file"}, timeout=30)
+            
+            if children_response.status_code == 200:
+                children_data = children_response.json()
+                items = children_data.get("value", [])
+                mpp_files = [item for item in items if item.get("file") and item.get("name", "").lower().endswith(".mpp")]
+                
+                if mpp_files:
+                    print(f"   ✅✅✅ SUCESSO! Encontrados {len(mpp_files)} arquivo(s) .mpp nesta pasta!")
+                    
+                    # Procura o arquivo específico mencionado
+                    target_file = "F703 - Relatórios Títulos Pagos Contas a Pagar – Dados Borderôs.mpp"
+                    found_file = None
+                    for file in mpp_files:
+                        if target_file.lower() in file.get("name", "").lower() or "F703" in file.get("name", ""):
+                            found_file = file
+                            break
+                    
+                    if found_file:
+                        print(f"\n   🎯 Arquivo específico encontrado: {found_file.get('name')}")
+                        size_mb = found_file.get("size", 0) / (1024 * 1024) if found_file.get("size") else 0
+                        print(f"      Tamanho: {size_mb:.2f} MB")
+                        print(f"      URL: {found_file.get('webUrl', 'N/A')}")
+                    
+                    print(f"\n📝 Para usar esta pasta, você pode:")
+                    print(f"   1. Usar o caminho completo (se disponível): {folder_path_from_id}")
+                    print(f"   2. Ou descobrir o caminho relativo navegando a partir da raiz")
+                    
+                    # Tenta descobrir o caminho relativo
+                    print(f"\n🔍 Tentando descobrir caminho relativo...")
+                    # O caminho do parentReference geralmente tem o formato: /drives/{drive-id}/root:/path
+                    if "/root:/" in folder_path_from_id:
+                        relative_path = folder_path_from_id.split("/root:/")[-1]
+                        print(f"   Caminho relativo descoberto: {relative_path}")
+                        print(f"\n💡 Configure a variável SHAREPOINT_FOLDER_PATH como:")
+                        print(f"   {relative_path}")
+                        return 0
+                    else:
+                        print(f"   Não foi possível extrair caminho relativo automaticamente")
+                        print(f"   Mas a pasta foi encontrada! Vamos testar caminhos comuns...\n")
+        else:
+            print(f"   ⚠️  Não foi possível acessar pasta pelo ID (status: {response.status_code})")
+            print(f"   Continuando com testes de caminho...\n")
+    except Exception as e:
+        print(f"   ⚠️  Erro ao acessar pasta pelo ID: {e}")
+        print(f"   Continuando com testes de caminho...\n")
     
     print(f"📋 Testando {len(test_paths)} caminho(s) específico(s)...\n")
     
