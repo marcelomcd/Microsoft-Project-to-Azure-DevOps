@@ -1087,8 +1087,11 @@ class MapperService:
         """
         Valida que um Work Item parent existe no Azure DevOps.
         
+        IMPORTANTE: A Feature sempre deve existir. Este método apenas valida sua existência.
+        Se a Feature não for encontrada, pode ser problema de permissão, projeto incorreto, ou cache.
+        
         Args:
-            parent_id: ID do Work Item parent
+            parent_id: ID do Work Item parent (Feature)
             
         Returns:
             True se existe, False caso contrário
@@ -1097,19 +1100,24 @@ class MapperService:
         logger = logging.getLogger(__name__)
         
         try:
-            work_item = self.devops_client.get_work_item_by_id(parent_id)
+            # Tenta buscar sem cache primeiro para garantir que está buscando do servidor
+            work_item = self.devops_client.get_work_item_by_id(parent_id, use_cache=False)
             if work_item is None:
-                logger.warning(f"Work Item {parent_id} não encontrado (retornou None)")
+                logger.error(f"❌ Feature {parent_id} não encontrada no Azure DevOps (retornou None)")
+                logger.error(f"   Verifique se a Feature existe e se o projeto está correto: {self.devops_client.project}")
                 return False
             
             # Verifica se é do tipo esperado (Feature, Epic, etc.)
             work_item_type = work_item.fields.get('System.WorkItemType', '')
-            logger.debug(f"Work Item {parent_id} encontrado: tipo={work_item_type}, título={work_item.fields.get('System.Title', 'N/A')}")
+            work_item_title = work_item.fields.get('System.Title', 'N/A')
+            logger.info(f"✅ Feature {parent_id} encontrada: tipo={work_item_type}, título={work_item_title}")
             return True
         except Exception as e:
-            logger.error(f"Erro ao validar Work Item {parent_id}: {type(e).__name__}: {str(e)}")
+            logger.error(f"❌ Erro ao validar Feature {parent_id}: {type(e).__name__}: {str(e)}")
+            logger.error(f"   Projeto configurado: {self.devops_client.project}")
+            logger.error(f"   Org configurada: {self.devops_client.org}")
             import traceback
-            logger.debug(f"Traceback: {traceback.format_exc()}")
+            logger.debug(f"Traceback completo: {traceback.format_exc()}")
             return False
     
     def _determine_area_path(
