@@ -111,8 +111,8 @@ class Settings(BaseSettings):
         description="URL do site SharePoint (ex: https://qualiitcombr-my.sharepoint.com/sites/projetosqualiit)"
     )
     SHAREPOINT_FOLDER_PATH: str = Field(
-        default="Documentos Compartilhados/Cronogramas - Project",
-        description="Caminho da pasta no SharePoint onde os arquivos .mpp estão localizados"
+        default="Cronogramas - Project",
+        description="Caminho da pasta no SharePoint onde os arquivos .mpp estão localizados (dentro da biblioteca 'Documentações de Projetos')"
     )
     USE_SHAREPOINT: bool = Field(
         default=False,
