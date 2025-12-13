@@ -22,8 +22,16 @@ class AzureDevOpsClient:
         self.pat = pat or settings.AZURE_DEVOPS_PAT
         self.org = settings.AZURE_DEVOPS_ORG
         self.project = settings.AZURE_DEVOPS_PROJECT
-        self.base_url = settings.azure_devops_base_url
         self.api_version = "7.1"
+        
+        # Valida e corrige org se necessário (trata $(AZURE_DEVOPS_ORG) não substituído)
+        if self.org.startswith('$(') and self.org.endswith(')'):
+            print(f"DevOpsClient: AVISO - Variável AZURE_DEVOPS_ORG não foi substituída: {self.org}")
+            print(f"DevOpsClient: Usando valor padrão: qualiit")
+            self.org = "qualiit"
+        
+        # Constrói base_url após validar org
+        self.base_url = f"https://dev.azure.com/{self.org}"
         
         # Valida PAT
         if not self.pat or self.pat.strip() == "" or self.pat == "SEU_PAT_AQUI":

@@ -24,6 +24,26 @@ class Settings(BaseSettings):
         default="Quali IT - Inovação e Tecnologia",
         description="Nome do projeto no Azure DevOps"
     )
+    
+    @field_validator('AZURE_DEVOPS_ORG', mode='before')
+    @classmethod
+    def parse_azure_devops_org(cls, v):
+        """Trata variáveis não definidas do Azure DevOps Pipeline"""
+        if isinstance(v, str):
+            # Se for a string literal da variável não definida no Azure DevOps, usa default
+            if v.startswith('$(') and v.endswith(')'):
+                return "qualiit"  # Default
+        return v
+    
+    @field_validator('AZURE_DEVOPS_ORG', mode='before')
+    @classmethod
+    def parse_azure_devops_org(cls, v):
+        """Trata variáveis não definidas do Azure DevOps Pipeline"""
+        if isinstance(v, str):
+            # Se for a string literal da variável não definida no Azure DevOps, usa default
+            if v.startswith('$(') and v.endswith(')'):
+                return "qualiit"  # Default
+        return v
     AZURE_DEVOPS_PAT: str = Field(
         default="",
         description="Personal Access Token do Azure DevOps (obrigatório via env var)"
