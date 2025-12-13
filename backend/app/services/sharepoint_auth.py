@@ -89,8 +89,41 @@ class SharePointAuthService:
             return self._access_token
         else:
             error_msg = result.get("error_description", result.get("error", "Erro desconhecido"))
-            logger.error(f"Falha ao obter access token: {error_msg}")
-            raise ValueError(f"Falha na autenticação: {error_msg}")
+            error_code = result.get("error", "")
+            
+            # Melhora mensagem de erro para casos comuns
+            if "AADSTS7000215" in error_msg or "Invalid client secret" in error_msg:
+                detailed_msg = (
+                    f"❌ Client Secret inválido!\n\n"
+                    f"   O erro indica que o SHAREPOINT_CLIENT_SECRET está incorreto.\n"
+                    f"   Certifique-se de usar o VALOR do secret, não o ID do secret.\n\n"
+                    f"   Como obter o valor correto:\n"
+                    f"   1. Acesse o Azure Portal (portal.azure.com)\n"
+                    f"   2. Vá em 'Microsoft Entra ID' > 'App registrations'\n"
+                    f"   3. Encontre o app com Client ID: {self.client_id}\n"
+                    f"   4. Vá em 'Certificates & secrets'\n"
+                    f"   5. Se o secret expirou, crie um novo\n"
+                    f"   6. Copie o VALOR do secret (não o ID)\n"
+                    f"   7. IMPORTANTE: Copie o valor ANTES de fechar a página (não será possível ver novamente)\n\n"
+                    f"   Erro original: {error_msg}"
+                )
+                logger.error(detailed_msg)
+                raise ValueError(detailed_msg)
+            elif "AADSTS700016" in error_msg or "Application" in error_msg:
+                detailed_msg = (
+                    f"❌ Application não encontrada no diretório!\n\n"
+                    f"   O Client ID '{self.client_id}' não foi encontrado no Tenant '{self.tenant_id}'.\n"
+                    f"   Verifique se:\n"
+                    f"   1. O SHAREPOINT_CLIENT_ID está correto\n"
+                    f"   2. O SHAREPOINT_TENANT_ID está correto\n"
+                    f"   3. O app está registrado no tenant correto\n\n"
+                    f"   Erro original: {error_msg}"
+                )
+                logger.error(detailed_msg)
+                raise ValueError(detailed_msg)
+            else:
+                logger.error(f"Falha ao obter access token: {error_msg}")
+                raise ValueError(f"Falha na autenticação: {error_msg}")
     
     def clear_token_cache(self) -> None:
         """Limpa cache de token (força renovação na próxima chamada)"""
