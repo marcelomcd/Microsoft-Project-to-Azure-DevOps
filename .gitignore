@@ -27,6 +27,10 @@ backend/venv/
 .env.*.local
 backend/.env
 
+# Scripts de teste com secrets (NUNCA commitar)
+backend/test_sharepoint.ps1
+backend/test_sharepoint_local.bat
+
 # IDEs
 .vscode/
 .idea/

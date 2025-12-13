@@ -25,13 +25,18 @@ $env:SHAREPOINT_SITE_URL = "https://qualiitcombr.sharepoint.com/sites/projetosqu
 $env:SHAREPOINT_CLIENT_ID = "2a41ace8-8b14-42db-808e-8681331138f5"
 $env:SHAREPOINT_TENANT_ID = "6eb6a2fd-839d-460d-9bb0-7ed15211a782"
 
-# Solicita Client Secret
-Write-Host ""
-Write-Host "Por favor, informe o SHAREPOINT_CLIENT_SECRET:" -ForegroundColor Yellow
-Write-Host "(O valor será ocultado por segurança)" -ForegroundColor Gray
-$secureSecret = Read-Host -AsSecureString
-$bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureSecret)
-$env:SHAREPOINT_CLIENT_SECRET = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+# Client Secret (hardcoded para testes - REMOVER EM PRODUÇÃO)
+# ATENÇÃO: Este secret está hardcoded apenas para facilitar testes locais
+# NUNCA commite este arquivo com o secret no repositório!
+$env:SHAREPOINT_CLIENT_SECRET = "4K88Q~u8vqfCeG5-OXUQ9QE6jDdI2GlS.jDRvcG2"
+
+# Alternativa: Se preferir inserir manualmente, descomente as linhas abaixo e comente a linha acima
+# Write-Host ""
+# Write-Host "Por favor, informe o SHAREPOINT_CLIENT_SECRET:" -ForegroundColor Yellow
+# Write-Host "(O valor será ocultado por segurança)" -ForegroundColor Gray
+# $secureSecret = Read-Host -AsSecureString
+# $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureSecret)
+# $env:SHAREPOINT_CLIENT_SECRET = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
 
 Write-Host ""
 Write-Host "Variáveis configuradas:" -ForegroundColor Green
