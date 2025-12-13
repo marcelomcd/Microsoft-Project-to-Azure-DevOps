@@ -107,6 +107,13 @@ class AzureDevOpsClient:
         params = kwargs.pop('params', {})
         params['api-version'] = self.api_version
         
+        # Log detalhado para debug
+        print(f"DevOpsClient: {method} {url}")
+        print(f"DevOpsClient: Projeto original: '{self.project}'")
+        print(f"DevOpsClient: Projeto codificado: '{project_encoded}'")
+        print(f"DevOpsClient: Org: {self.org}")
+        print(f"DevOpsClient: Base URL: {self.base_url}")
+        
         # Merge headers se fornecidos
         headers = kwargs.pop('headers', {})
         if headers:
@@ -129,10 +136,20 @@ class AzureDevOpsClient:
                 error_msg = f"Erro de autenticação. Verifique se o AZURE_DEVOPS_PAT está configurado corretamente no arquivo .env"
                 raise requests.exceptions.HTTPError(error_msg, response=response)
             
-            # Verifica se a resposta é HTML (geralmente indica erro de autenticação)
+            # Verifica se a resposta é HTML (geralmente indica erro de autenticação ou projeto não encontrado)
             content_type = response.headers.get('Content-Type', '')
             if 'text/html' in content_type and response.status_code != 200:
-                error_msg = f"Resposta inesperada do servidor (HTML ao invés de JSON). Verifique a autenticação. Status: {response.status_code}"
+                from urllib.parse import quote
+                html_preview = response.text[:500] if response.text else "Resposta vazia"
+                error_msg = (
+                    f"Resposta inesperada do servidor (HTML ao invés de JSON). "
+                    f"Status: {response.status_code}, URL: {response.url}. "
+                    f"Projeto configurado: '{self.project}' (codificado: '{quote(self.project, safe='')}'). "
+                    f"Org: {self.org}. "
+                    f"Verifique se o projeto '{self.project}' existe na organização '{self.org}'. "
+                    f"Preview HTML: {html_preview[:200]}"
+                )
+                print(f"DevOpsClient: ERRO - {error_msg}")
                 raise requests.exceptions.HTTPError(error_msg, response=response)
             
             response.raise_for_status()
