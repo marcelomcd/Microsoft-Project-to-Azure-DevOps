@@ -234,7 +234,8 @@ def main():
         test_paths.insert(0, settings.SHAREPOINT_FOLDER_PATH)
     
     site_id = service._get_site_id()
-    drive_id = service._get_drive_id(site_id)
+    # Usa "Documentações de Projetos" como biblioteca preferida
+    drive_id = service._get_drive_id(site_id, drive_name_preference="Documentações de Projetos")
     
     # Primeiro, tenta acessar diretamente pelo ID do link de compartilhamento
     print("🔗 Testando acesso direto pelo ID do link de compartilhamento...")

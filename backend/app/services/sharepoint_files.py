@@ -114,13 +114,14 @@ class SharePointFileService:
                 logger.error(f"Resposta: {e.response.text}")
             raise ValueError(f"Falha ao obter Site ID do SharePoint: {e}")
     
-    def _get_drive_id(self, site_id: str, return_all: bool = False) -> str | List[Dict[str, Any]]:
+    def _get_drive_id(self, site_id: str, return_all: bool = False, drive_name_preference: Optional[str] = None) -> str | List[Dict[str, Any]]:
         """
         Obtém o Drive ID (document library) do SharePoint.
         
         Args:
             site_id: Site ID do SharePoint
-            return_all: Se True, retorna lista de todos os drives. Se False, retorna apenas o ID do drive "Documentos Compartilhados" ou o primeiro disponível.
+            return_all: Se True, retorna lista de todos os drives. Se False, retorna apenas o ID do drive preferido ou o primeiro disponível.
+            drive_name_preference: Nome da biblioteca preferida (ex: "Documentações de Projetos"). Se None, tenta "Documentos Compartilhados" primeiro.
             
         Returns:
             Drive ID (string) ou lista de drives (dict) se return_all=True
@@ -152,16 +153,27 @@ class SharePointFileService:
             if return_all:
                 return drives
             
-            # Tenta encontrar "Documentos Compartilhados" primeiro
-            for drive in drives:
-                drive_name = drive.get("name", "")
-                if "Documentos Compartilhados" in drive_name or "Shared Documents" in drive_name:
-                    drive_id = drive.get("id")
-                    if drive_id:
-                        logger.debug(f"Drive ID obtido (Documentos Compartilhados): {drive_id}")
-                        return drive_id
+            # Lista de nomes preferidos (em ordem de prioridade)
+            preferred_names = []
+            if drive_name_preference:
+                preferred_names.append(drive_name_preference)
+            preferred_names.extend([
+                "Documentações de Projetos",
+                "Documentos Compartilhados",
+                "Shared Documents"
+            ])
             
-            # Se não encontrou, usa o primeiro drive disponível
+            # Tenta encontrar biblioteca preferida
+            for preferred_name in preferred_names:
+                for drive in drives:
+                    drive_name = drive.get("name", "")
+                    if preferred_name.lower() in drive_name.lower():
+                        drive_id = drive.get("id")
+                        if drive_id:
+                            logger.debug(f"Drive ID obtido ({drive_name}): {drive_id}")
+                            return drive_id
+            
+            # Se não encontrou nenhuma preferida, usa o primeiro drive disponível
             drive_id = drives[0].get("id")
             
             if not drive_id:
