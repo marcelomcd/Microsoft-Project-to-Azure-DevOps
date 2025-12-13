@@ -897,17 +897,8 @@ class MapperService:
             result: Resultado da conversão (será atualizado)
             item_map: Mapa de task_id -> work_item_id
         """
-        # Double check: valida que parent existe
-        if parent_id and not self._validate_parent_exists(parent_id):
-            error_msg = f"Parent {parent_id} não existe"
-            result.errors.append(error_msg)
-            self.sync_logger.log_failed_task(
-                title=title,
-                error=error_msg,
-                parent_id=parent_id,
-                mpp_task_id=task_id
-            )
-            return
+        # Não valida parent aqui - deixa o Azure DevOps retornar erro real se não existir
+        # A busca por título exato já funciona mesmo se a validação falhar
         
         # Prepara campos customizados
         custom_fields = self._prepare_custom_fields(task)
