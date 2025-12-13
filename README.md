@@ -241,8 +241,6 @@ Para configurar o acesso ao SharePoint, você precisa criar um App Registration:
     - `Files.Read.All`
 11. Clique em **Grant admin consent** para conceder as permissões
 
-Em nosso projeto, estamos usando **SharePointVerify**, que já **possui as permissões necessárias**
-
 #### Verificação da Configuração
 
 Após configurar, execute a pipeline manualmente e verifique os logs:
@@ -356,8 +354,13 @@ O nome do arquivo `.mpp` deve seguir o padrão:
 │   │   │   ├── sharepoint_auth.py   # Autenticação SharePoint
 │   │   │   ├── sharepoint_files.py  # Download de arquivos SharePoint
 │   │   │   ├── sync_history.py      # Histórico de sincronizações
-│   │   │   └── sync_logger.py       # Logger de sincronização
+│   │   │   ├── sync_logger.py       # Logger de sincronização
+│   │   │   └── workitem_analyzer.py # Analisador de Work Items
 │   │   ├── routers/             # Endpoints da API
+│   │   │   ├── convert.py       # Endpoint de conversão
+│   │   │   ├── projects.py      # Endpoint de projetos
+│   │   │   ├── upload.py        # Endpoint de upload
+│   │   │   └── workitems.py     # Endpoint de work items
 │   │   └── utils/                # Utilitários
 │   │       ├── cache.py          # Sistema de cache
 │   │       ├── resource_mapper.py # Mapeamento de recursos
@@ -365,13 +368,20 @@ O nome do arquivo `.mpp` deve seguir o padrão:
 │   ├── lib/                      # Bibliotecas Java (MPXJ e dependências)
 │   │   ├── mpxj.jar              # MPXJ (parsing MPP)
 │   │   ├── MppToJson.java       # Script Java para conversão
-│   │   └── [dependências Java]   # Outras bibliotecas necessárias
+│   │   ├── MppToJson.class      # Classe compilada Java
+│   │   ├── poi.jar               # Apache POI (dependência MPXJ)
+│   │   ├── poi-ooxml.jar        # Apache POI OOXML
+│   │   ├── poi-scratchpad.jar   # Apache POI Scratchpad
+│   │   ├── jackson-*.jar         # Jackson JSON (dependências)
+│   │   ├── commons-*.jar        # Apache Commons (dependências)
+│   │   └── log4j-*.jar          # Log4j (dependências)
 │   ├── logs/                     # Logs do sistema e histórico de sincronização
 │   ├── pipeline_sync.py          # Script principal para execução agendada
 │   ├── test_sharepoint_path.py   # Script para descobrir caminho SharePoint
 │   ├── requirements.txt          # Dependências Python
 │   └── env.example.txt           # Exemplo de variáveis de ambiente
 ├── azure-pipelines.yml           # Definição da pipeline Azure DevOps
+├── DOCUMENTACAO_COMPLETA.md     # Documentação completa do sistema
 └── README.md                     # Este arquivo
 ```
 
@@ -530,6 +540,6 @@ Para problemas ou dúvidas:
 ---
 
 **Última atualização**: 13/12/2025  
-**Versão**: 1.0.2
-**Desenvolvido por**: **Marcelo Macedo**
+**Versão**: 1.0.2  
+**Desenvolvido por**: Marcelo Macedo  
 **E-mail**: [marcelo.macedo@qualiit.com.br](mailto:marcelo.macedo@qualiit.com.br)
