@@ -2,7 +2,7 @@
 import logging
 import requests
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from urllib.parse import urlparse, urljoin
 import tempfile
 
@@ -114,7 +114,7 @@ class SharePointFileService:
                 logger.error(f"Resposta: {e.response.text}")
             raise ValueError(f"Falha ao obter Site ID do SharePoint: {e}")
     
-    def _get_drive_id(self, site_id: str, return_all: bool = False, drive_name_preference: Optional[str] = None) -> str | List[Dict[str, Any]]:
+    def _get_drive_id(self, site_id: str, return_all: bool = False, drive_name_preference: Optional[str] = None) -> Union[str, List[Dict[str, Any]]]:
         """
         Obtém o Drive ID (document library) do SharePoint.
         
