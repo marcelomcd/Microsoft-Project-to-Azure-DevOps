@@ -170,7 +170,7 @@ class MPPParser:
         
         print(f"MPPParser: filename={filename}, work_item_id={work_item_id}, project_name_from_file={project_name_from_file}")
         
-        # Tenta usar MPXJ via Java CLI primeiro
+        # Tenta usar MPXJ via Java CLI primeiro (método mais confiável)
         json_data = self._export_mpp_to_json_java(file_path)
         
         parsed_data = None
@@ -187,36 +187,9 @@ class MPPParser:
                 return parsed_data
         
         # Se Java MPXJ falhou ou não retornou dados, tenta mpxj Python se disponível
-        project_name = project_name_from_file or "Projeto Sem Nome"
-        tasks = []
-        
-        if MPXJ_PYTHON_AVAILABLE:
-            try:
-                print(f"MPPParser: Tentando ler arquivo com mpxj Python: {file_path}")
-                project_file = mpxj.read(file_path)
-                # Extrai nome do projeto (primeira linha ou do arquivo)
-                project_name = project_file.properties.project_title or project_name_from_file or "Projeto Sem Nome"
-                
-                print(f"MPPParser: Projeto lido com mpxj. Título: {project_name}")
-                
-                # Processa tarefas
-                tasks = self._extract_tasks(project_file)
-                print(f"MPPParser: {len(tasks)} tarefas extraídas")
-            except Exception as e:
-                print(f"MPPParser: Erro ao ler com mpxj Python: {e}")
-                import traceback
-                traceback.print_exc()
-                # Se falhar, tenta CSV como fallback
-                parsed_data = self.parse_csv_fallback(file_path, original_filename=original_filename)
-                if parsed_data:
-                    # Armazena no cache
-                    if use_cache:
-                        self.cache.set_by_file(file_path, parsed_data)
-                    return parsed_data
-        else:
-            # Se mpxj não estiver disponível e Java MPXJ também falhou, tenta CSV como fallback
-            if not parsed_data:
-                print("MPPParser: mpxj não disponível e Java MPXJ falhou, usando fallback CSV")
+        # Se o método Java falhou, tenta CSV como fallback
+        if not parsed_data:
+            print("MPPParser: Java MPXJ falhou, tentando fallback CSV")
                 parsed_data = self.parse_csv_fallback(file_path, original_filename=original_filename)
                 if parsed_data:
                     # Armazena no cache
