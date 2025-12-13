@@ -191,8 +191,16 @@ class SharePointFileService:
         access_token = self.auth_service.get_access_token()
         
         # Busca pasta pelo caminho
-        # Escapa caracteres especiais no caminho
-        folder_path_encoded = folder_path.replace("'", "''")
+        # Microsoft Graph API requer codificação URL para o caminho
+        # Mas não codifica a barra "/" - apenas os caracteres especiais
+        from urllib.parse import quote
+        
+        # Divide o caminho em partes e codifica cada parte separadamente
+        path_parts = folder_path.split("/")
+        encoded_parts = [quote(part, safe="") for part in path_parts]
+        folder_path_encoded = "/".join(encoded_parts)
+        
+        # Tenta primeiro com codificação URL
         url = f"{self.graph_base_url}/drives/{drive_id}/root:/{folder_path_encoded}"
         
         headers = {
@@ -204,8 +212,15 @@ class SharePointFileService:
             response = requests.get(url, headers=headers, timeout=30)
             
             if response.status_code == 404:
-                logger.warning(f"Pasta não encontrada: {folder_path}")
-                return None
+                # Tenta sem codificação (alguns casos funcionam assim)
+                logger.debug(f"Tentativa 1 falhou (404): {url}")
+                url_alt = f"{self.graph_base_url}/drives/{drive_id}/root:/{folder_path}"
+                response = requests.get(url_alt, headers=headers, timeout=30)
+                
+                if response.status_code == 404:
+                    logger.warning(f"Pasta não encontrada: {folder_path}")
+                    logger.debug(f"Tentativa 2 também falhou (404): {url_alt}")
+                    return None
             
             response.raise_for_status()
             folder_data = response.json()
@@ -215,6 +230,8 @@ class SharePointFileService:
             return folder_id
         except requests.exceptions.RequestException as e:
             logger.warning(f"Erro ao obter Folder ID para {folder_path}: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                logger.debug(f"Resposta do erro: {e.response.status_code} - {e.response.text[:200]}")
             return None
     
     def list_mpp_files(self) -> List[Dict[str, Any]]:

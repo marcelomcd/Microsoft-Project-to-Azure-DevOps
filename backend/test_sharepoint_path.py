@@ -209,36 +209,59 @@ def main():
         traceback.print_exc()
         return 1
     
-    # Testa o caminho atual configurado primeiro
-    print_section("🧪 TESTANDO CAMINHO CONFIGURADO")
-    if settings.SHAREPOINT_FOLDER_PATH:
-        print(f"📋 Caminho atual configurado: {settings.SHAREPOINT_FOLDER_PATH}")
+    # Testa caminhos específicos baseados no link fornecido
+    print_section("🧪 TESTANDO CAMINHOS ESPECÍFICOS")
+    
+    # Caminhos a testar baseados no link fornecido
+    test_paths = [
+        "Cronogramas - Project",  # Apenas a subpasta (mais comum)
+        "Documentos Compartilhados/Cronogramas - Project",  # Caminho completo
+        "Documentações de Projetos/Cronogramas - Project",  # Nome de exibição
+    ]
+    
+    # Adiciona o caminho configurado se existir
+    if settings.SHAREPOINT_FOLDER_PATH and settings.SHAREPOINT_FOLDER_PATH not in test_paths:
+        test_paths.insert(0, settings.SHAREPOINT_FOLDER_PATH)
+    
+    site_id = service._get_site_id()
+    drive_id = service._get_drive_id(site_id)
+    
+    print(f"📋 Testando {len(test_paths)} caminho(s) específico(s)...\n")
+    
+    for test_path in test_paths:
+        print(f"🔍 Testando: {test_path}")
         try:
-            site_id = service._get_site_id()
-            drive_id = service._get_drive_id(site_id)
-            folder_id = service._get_folder_id(drive_id, settings.SHAREPOINT_FOLDER_PATH)
+            folder_id = service._get_folder_id(drive_id, test_path)
             
             if folder_id:
-                print(f"✅ Pasta encontrada! ID: {folder_id[:20]}...")
+                print(f"   ✅ Pasta encontrada! ID: {folder_id[:30]}...")
                 # Lista arquivos nesta pasta
-                folders_test, mpp_files_test = list_folders_and_files(service, settings.SHAREPOINT_FOLDER_PATH)
+                folders_test, mpp_files_test = list_folders_and_files(service, test_path)
                 if mpp_files_test:
-                    print(f"✅ Encontrados {len(mpp_files_test)} arquivo(s) .mpp nesta pasta!")
-                    print("\n📝 O caminho configurado está CORRETO!")
-                    print(f"\n💡 Use este valor para SHAREPOINT_FOLDER_PATH:")
-                    print(f"   {settings.SHAREPOINT_FOLDER_PATH}")
+                    print(f"   ✅✅✅ SUCESSO! Encontrados {len(mpp_files_test)} arquivo(s) .mpp nesta pasta!")
+                    print(f"\n📝 O caminho CORRETO é:")
+                    print(f"   {test_path}")
+                    print(f"\n💡 Configure a variável SHAREPOINT_FOLDER_PATH como:")
+                    print(f"   {test_path}")
+                    
+                    # Mostra alguns arquivos encontrados
+                    print(f"\n📄 Arquivos encontrados (primeiros 5):")
+                    for file_info in mpp_files_test[:5]:
+                        size_mb = file_info.get("size", 0) / (1024 * 1024) if file_info.get("size") else 0
+                        print(f"   - {file_info.get('name', 'N/A')} ({size_mb:.2f} MB)")
+                    if len(mpp_files_test) > 5:
+                        print(f"   ... e mais {len(mpp_files_test) - 5} arquivo(s)")
+                    
                     return 0
                 else:
-                    print("⚠️  Pasta encontrada, mas nenhum arquivo .mpp encontrado nela.")
-                    print("   Continuando busca em outras pastas...\n")
+                    print(f"   ⚠️  Pasta encontrada, mas nenhum arquivo .mpp encontrado nela.")
             else:
-                print("❌ Pasta não encontrada com o caminho configurado.")
-                print("   Continuando busca em outras pastas...\n")
+                print(f"   ❌ Pasta não encontrada com este caminho.")
         except Exception as e:
-            print(f"⚠️  Erro ao testar caminho configurado: {e}")
-            print("   Continuando busca em outras pastas...\n")
-    else:
-        print("ℹ️  Nenhum caminho configurado. Buscando em todas as pastas...\n")
+            print(f"   ❌ Erro ao testar caminho: {e}")
+        print()
+    
+    print("⚠️  Nenhum dos caminhos específicos funcionou. Continuando busca em todas as pastas...\n")
     
     # Lista conteúdo da raiz
     print_section("📁 CONTEÚDO DA RAIZ")
