@@ -36,6 +36,7 @@ class FileProcessor:
         self,
         file_path: Path,
         parent_feature_id: Optional[int] = None,
+        original_filename: Optional[str] = None,
         update_existing: bool = True,
         skip_duplicates: bool = True
     ) -> Dict[str, Any]:
@@ -45,6 +46,7 @@ class FileProcessor:
         Args:
             file_path: Caminho do arquivo .mpp
             parent_feature_id: ID da Feature pai (opcional, será extraído do nome se não fornecido)
+            original_filename: Nome original do arquivo (usado quando file_path é temporário, ex: arquivos do SharePoint)
             update_existing: Se True, atualiza itens existentes
             skip_duplicates: Se True, pula itens duplicados
             
@@ -57,7 +59,8 @@ class FileProcessor:
             - conversion_result: ConversionResult|None - Resultado da conversão
             - error: str|None - Mensagem de erro se houver falha
         """
-        filename = file_path.name
+        # Usa original_filename se fornecido, senão usa o nome do arquivo no caminho
+        filename = original_filename or file_path.name
         logger.info(f"Iniciando processamento do arquivo: {filename}")
         
         result = {
@@ -70,7 +73,7 @@ class FileProcessor:
         }
         
         try:
-            # Passo 1: Parse do arquivo
+            # Passo 1: Parse do arquivo (usa original_filename para o parser também)
             logger.debug(f"Fazendo parse do arquivo: {file_path}")
             parsed_data = self.parser.parse_file(str(file_path), original_filename=filename)
             
@@ -83,6 +86,7 @@ class FileProcessor:
             result["parsed_data"] = parsed_data
             
             # Passo 2: Extrai Work Item ID do nome do arquivo ou usa fornecido
+            # IMPORTANTE: Usa filename (que pode ser original_filename) para extrair o Work Item ID
             work_item_id = parent_feature_id
             if not work_item_id:
                 work_item_id_from_filename, _ = validate_mpp_filename(filename)

@@ -182,6 +182,7 @@ def process_files_sharepoint(
             logger.info(f"Processando arquivo: {filename}")
             process_result = file_processor.process_mpp_file(
                 file_path=temp_file,
+                original_filename=filename,  # Passa o nome original do SharePoint
                 update_existing=True,
                 skip_duplicates=True
             )
