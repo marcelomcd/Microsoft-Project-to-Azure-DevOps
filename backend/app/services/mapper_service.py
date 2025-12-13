@@ -87,6 +87,37 @@ class MapperService:
         # Determina parent_feature_id se não fornecido
         parent_feature_id = self._resolve_parent_feature_id(parsed_data, parent_feature_id)
         
+        # VALIDAÇÃO CRÍTICA: Verifica se a Feature existe ANTES de processar
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        if parent_feature_id:
+            logger.info(f"🔍 Validando Feature {parent_feature_id} antes de processar...")
+            logger.info(f"   Projeto configurado: {self.devops_client.project}")
+            logger.info(f"   Org configurada: {self.devops_client.org}")
+            
+            if not self._validate_parent_exists(parent_feature_id):
+                error_msg = (
+                    f"❌ ERRO CRÍTICO: Feature {parent_feature_id} não foi encontrada no Azure DevOps!\n"
+                    f"   Projeto: {self.devops_client.project}\n"
+                    f"   Org: {self.devops_client.org}\n"
+                    f"   Verifique:\n"
+                    f"   1. Se a Feature {parent_feature_id} existe no projeto '{self.devops_client.project}'\n"
+                    f"   2. Se a variável AZURE_DEVOPS_PROJECT está configurada corretamente na pipeline\n"
+                    f"   3. Se o PAT tem permissão para ler Work Items no projeto\n"
+                    f"   4. Acesse: https://dev.azure.com/{self.devops_client.org}/{self.devops_client.project.replace(' ', '%20')}/_workitems/edit/{parent_feature_id}"
+                )
+                logger.error(error_msg)
+                result.errors.append(error_msg)
+                # Finaliza registro mesmo com erro
+                sync_log = self.sync_logger.finish_sync()
+                result.sync_log = sync_log
+                return result
+            else:
+                logger.info(f"✅ Feature {parent_feature_id} validada com sucesso!")
+        else:
+            logger.warning("⚠️  Nenhum parent_feature_id fornecido - User Stories e Tasks serão criadas sem parent")
+        
         # Determina Area Path e Iteration Path
         area_path, iteration_path = self._resolve_paths(
             parsed_data, 
