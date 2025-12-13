@@ -501,12 +501,14 @@ class AzureDevOpsClient:
             
             # Relação com parent se houver
             if work_item.parent_id:
+                from urllib.parse import quote
+                project_encoded = quote(self.project, safe='', encoding='utf-8')
                 fields.append({
                     "op": "add",
                     "path": "/relations/-",
                     "value": {
                         "rel": "System.LinkTypes.Hierarchy-Reverse",
-                        "url": f"{self.base_url}/{self.project}/_apis/wit/workitems/{work_item.parent_id}"
+                        "url": f"{self.base_url}/{project_encoded}/_apis/wit/workitems/{work_item.parent_id}"
                     }
                 })
             
