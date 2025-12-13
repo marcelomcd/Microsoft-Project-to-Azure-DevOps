@@ -4,18 +4,19 @@ Sistema automatizado para sincronizar arquivos `.mpp` (Microsoft Project) do Sha
 
 ## 📋 Índice
 
-1. [Visão Geral](#visão-geral)
+1. [Visão Geral](#visao-geral)
 2. [Arquitetura do Sistema](#arquitetura-do-sistema)
-3. [Pré-requisitos](#pré-requisitos)
-4. [Instalação](#instalação)
-5. [Configuração](#configuração)
+3. [Pré-requisitos](#pre-requisitos)
+4. [Instalação](#instalacao)
+5. [Configuração](#configuracao)
 6. [Funcionamento](#funcionamento)
 7. [Estrutura do Projeto](#estrutura-do-projeto)
 8. [Troubleshooting](#troubleshooting)
-9. [Referência Rápida](#referência-rápida)
+9. [Referência Rápida](#referencia-rapida)
 
 ---
 
+<a name="visao-geral"></a>
 ## 🎯 Visão Geral
 
 ### Funcionalidades Principais
@@ -40,6 +41,7 @@ Sistema automatizado para sincronizar arquivos `.mpp` (Microsoft Project) do Sha
 
 ---
 
+<a name="arquitetura-do-sistema"></a>
 ## 🏗️ Arquitetura do Sistema
 
 ### Fluxo de Execução
@@ -76,6 +78,7 @@ Azure DevOps (Work Items)
 
 ---
 
+<a name="pre-requisitos"></a>
 ## 📋 Pré-requisitos
 
 - **Python 3.9+**
@@ -85,6 +88,7 @@ Azure DevOps (Work Items)
 
 ---
 
+<a name="instalacao"></a>
 ## 🛠️ Instalação
 
 ### Instalação Local (para testes)
@@ -107,6 +111,7 @@ cp env.example.txt .env
 
 ---
 
+<a name="configuracao"></a>
 ## ⚙️ Configuração
 
 ### Configuração Local (para testes)
@@ -258,6 +263,7 @@ Após configurar, execute a pipeline manualmente e verifique os logs:
 
 ---
 
+<a name="funcionamento"></a>
 ## 🔄 Funcionamento
 
 ### Processo de Sincronização
@@ -334,6 +340,7 @@ O nome do arquivo `.mpp` deve seguir o padrão:
 
 ---
 
+<a name="estrutura-do-projeto"></a>
 ## 📁 Estrutura do Projeto
 
 ```
@@ -387,6 +394,7 @@ O nome do arquivo `.mpp` deve seguir o padrão:
 
 ---
 
+<a name="execucao"></a>
 ## 🚀 Execução
 
 ### Execução Local (para testes)
@@ -419,6 +427,7 @@ O sistema suporta execução agendada via pipeline do Azure DevOps para processa
 
 ---
 
+<a name="troubleshooting"></a>
 ## 🔍 Troubleshooting
 
 ### Erro: "404 Client Error: Not Found"
@@ -478,6 +487,7 @@ O sistema suporta execução agendada via pipeline do Azure DevOps para processa
 
 ---
 
+<a name="referencia-rapida"></a>
 ## 📖 Referência Rápida
 
 ### Comandos Úteis
