@@ -380,8 +380,8 @@ O nome do arquivo `.mpp` deve seguir o padrão:
 │   ├── test_sharepoint_path.py   # Script para descobrir caminho SharePoint
 │   ├── requirements.txt          # Dependências Python
 │   └── env.example.txt           # Exemplo de variáveis de ambiente
+├── .gitignore                    # Arquivos ou pastas ignorados
 ├── azure-pipelines.yml           # Definição da pipeline Azure DevOps
-├── DOCUMENTACAO_COMPLETA.md     # Documentação completa do sistema
 └── README.md                     # Este arquivo
 ```
 
