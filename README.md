@@ -241,6 +241,8 @@ Para configurar o acesso ao SharePoint, você precisa criar um App Registration:
     - `Files.Read.All`
 11. Clique em **Grant admin consent** para conceder as permissões
 
+Estamos usando SharePointVerify, que já possui as permissões necessárias
+
 #### Verificação da Configuração
 
 Após configurar, execute a pipeline manualmente e verifique os logs:
