@@ -186,63 +186,19 @@ class MPPParser:
                     self.cache.set_by_file(file_path, parsed_data)
                 return parsed_data
         
-        # Se Java MPXJ falhou ou não retornou dados, tenta mpxj Python se disponível
         # Se o método Java falhou, tenta CSV como fallback
         if not parsed_data:
             print("MPPParser: Java MPXJ falhou, tentando fallback CSV")
-                parsed_data = self.parse_csv_fallback(file_path, original_filename=original_filename)
-                if parsed_data:
-                    # Armazena no cache
-                    if use_cache:
-                        self.cache.set_by_file(file_path, parsed_data)
-                    return parsed_data
-        
-        # Se chegamos aqui, significa que mpxj Python foi usado com sucesso
-        # (Java MPXJ já teria retornado se tivesse sucesso)
-        if not tasks:
-            # Se não temos tarefas, tenta CSV como último recurso
-            print("MPPParser: Nenhuma tarefa extraída, tentando CSV como fallback")
             parsed_data = self.parse_csv_fallback(file_path, original_filename=original_filename)
             if parsed_data:
+                # Armazena no cache
                 if use_cache:
                     self.cache.set_by_file(file_path, parsed_data)
                 return parsed_data
             # Se CSV também falhou, retorna erro
-            raise ValueError(f"Não foi possível extrair tarefas do arquivo {filename}")
+            raise ValueError(f"Não foi possível extrair tarefas do arquivo {filename}. Verifique se o arquivo é um .mpp válido e se Java está instalado.")
         
-        # Se não tem nome do arquivo, usa o título do projeto
-        if not project_name_from_file:
-            project_name_from_file = project_name
-        
-        # Classifica em User Stories e Tasks
-        # Remove a primeira tarefa se for summary de nível 0 (projeto)
-        # Inclui todas as outras tarefas (summary tasks também podem ser User Stories se não tiverem recurso)
-        non_project_tasks = [
-            t for t in tasks 
-            if not (t.summary and (t.level or 0) == 0)  # Exclui apenas o projeto raiz (summary de nível 0)
-        ]
-        user_stories, classified_tasks = self._classify_tasks(non_project_tasks)
-        
-        print(f"MPPParser: Classificação - User Stories: {len(user_stories)}, Tasks: {len(classified_tasks)}")
-        
-        # Cria modelo do projeto
-        mpp_project = MPPProject(
-            name=project_name,
-            file_name=filename,
-            work_item_id=work_item_id,
-            tasks=tasks  # Inclui todas as tarefas, incluindo summary
-        )
-        
-        parsed_data = ParsedMPPData(
-            project=mpp_project,
-            user_stories=user_stories,
-            tasks=classified_tasks
-        )
-        
-        # Armazena no cache
-        if use_cache and parsed_data:
-            self.cache.set_by_file(file_path, parsed_data)
-        
+        # Se chegou aqui, parsed_data foi criado com sucesso via Java MPXJ
         return parsed_data
     
     def _parse_from_json(self, json_data: dict, filename: str, work_item_id: Optional[str], project_name_from_file: Optional[str]) -> ParsedMPPData:

@@ -150,7 +150,11 @@ steps:
   - script: |
       echo "##vso[task.complete result=Succeeded;]Sincronização concluída"
       if [ -f "backend/logs/sync_history.json" ]; then
-        echo "##vso[task.addattachment type=file;name=sync_history;]backend/logs/sync_history.json"
+        echo "Histórico de sincronização encontrado"
+        echo "Primeiras linhas do histórico:"
+        head -20 backend/logs/sync_history.json
+      else
+        echo "Histórico de sincronização não encontrado (pode ser primeira execução)"
       fi
     displayName: 'Publicar resumo'
     condition: always()
