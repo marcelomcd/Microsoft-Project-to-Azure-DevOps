@@ -54,8 +54,13 @@ class MPPParser:
     
     def _export_mpp_to_json_java(self, mpp_file: str) -> Optional[dict]:
         """Exporta arquivo .mpp para JSON usando MPXJ via Java CLI"""
-        if not self.java_available or not self.mpxj_jar_path:
+        if not self.java_available:
+            print("MPPParser: Java não está disponível")
             return None
+        if not self.mpxj_jar_path:
+            print("MPPParser: mpxj.jar não encontrado no diretório lib")
+            return None
+        print(f"MPPParser: Usando Java MPXJ - JAR: {self.mpxj_jar_path}")
         
         try:
             # Cria arquivo JSON temporário
@@ -123,7 +128,9 @@ class MPPParser:
                                       timeout=60)
                 
                 if result.returncode != 0:
-                    print(f"Erro ao executar MppToJson: {result.stderr}")
+                    print(f"MPPParser: Erro ao executar MppToJson (código {result.returncode})")
+                    print(f"MPPParser: stderr: {result.stderr}")
+                    print(f"MPPParser: stdout: {result.stdout}")
                     return None
                 
                 # Lê o JSON gerado
