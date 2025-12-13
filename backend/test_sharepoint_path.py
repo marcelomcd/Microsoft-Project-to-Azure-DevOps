@@ -217,6 +217,11 @@ def main():
         "Cronogramas - Project",  # Apenas a subpasta (mais comum)
         "Documentos Compartilhados/Cronogramas - Project",  # Caminho completo
         "Documentações de Projetos/Cronogramas - Project",  # Nome de exibição
+        # Tentativa com codificação específica sugerida
+        "%252fDocumentos%2bCompartilhados%252fCronogramas%2b-%2bProject",
+        # Variações com espaços como +
+        "Documentos+Compartilhados/Cronogramas+-+Project",
+        "Documentos+Compartilhados/Cronogramas+-+Project",
     ]
     
     # Adiciona o caminho configurado se existir

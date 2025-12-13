@@ -192,47 +192,77 @@ class SharePointFileService:
         
         # Busca pasta pelo caminho
         # Microsoft Graph API requer codificação URL para o caminho
-        # Mas não codifica a barra "/" - apenas os caracteres especiais
-        from urllib.parse import quote
-        
-        # Divide o caminho em partes e codifica cada parte separadamente
-        path_parts = folder_path.split("/")
-        encoded_parts = [quote(part, safe="") for part in path_parts]
-        folder_path_encoded = "/".join(encoded_parts)
-        
-        # Tenta primeiro com codificação URL
-        url = f"{self.graph_base_url}/drives/{drive_id}/root:/{folder_path_encoded}"
+        # Tenta múltiplas variações de codificação
+        from urllib.parse import quote, unquote
         
         headers = {
             "Authorization": f"Bearer {access_token}",
             "Accept": "application/json"
         }
         
-        try:
-            response = requests.get(url, headers=headers, timeout=30)
-            
-            if response.status_code == 404:
-                # Tenta sem codificação (alguns casos funcionam assim)
-                logger.debug(f"Tentativa 1 falhou (404): {url}")
-                url_alt = f"{self.graph_base_url}/drives/{drive_id}/root:/{folder_path}"
-                response = requests.get(url_alt, headers=headers, timeout=30)
+        # Lista de variações de codificação para tentar
+        encoding_variations = []
+        
+        # 1. Se já está codificado, tenta usar diretamente
+        if "%" in folder_path:
+            encoding_variations.append(folder_path)
+            # Tenta decodificar e recodificar
+            try:
+                decoded = unquote(folder_path)
+                encoding_variations.append(decoded)
+            except:
+                pass
+        
+        # 2. Codificação padrão (divide em partes e codifica cada parte)
+        path_parts = folder_path.split("/")
+        encoded_parts = [quote(part, safe="") for part in path_parts]
+        encoding_variations.append("/".join(encoded_parts))
+        
+        # 3. Codificação com espaços como +
+        path_with_plus = folder_path.replace(" ", "+")
+        encoding_variations.append(path_with_plus)
+        
+        # 4. Sem codificação (caminho original)
+        encoding_variations.append(folder_path)
+        
+        # Remove duplicatas mantendo ordem
+        seen = set()
+        unique_variations = []
+        for var in encoding_variations:
+            if var not in seen:
+                seen.add(var)
+                unique_variations.append(var)
+        
+        # Tenta cada variação
+        last_error = None
+        for i, encoded_path in enumerate(unique_variations, 1):
+            url = f"{self.graph_base_url}/drives/{drive_id}/root:/{encoded_path}"
+            try:
+                response = requests.get(url, headers=headers, timeout=30)
+                
+                if response.status_code == 200:
+                    folder_data = response.json()
+                    folder_id = folder_data.get("id")
+                    if folder_id:
+                        logger.debug(f"Folder ID obtido (tentativa {i}): {folder_id} para {folder_path} (codificação: {encoded_path[:50]}...)")
+                        return folder_id
                 
                 if response.status_code == 404:
-                    logger.warning(f"Pasta não encontrada: {folder_path}")
-                    logger.debug(f"Tentativa 2 também falhou (404): {url_alt}")
-                    return None
+                    logger.debug(f"Tentativa {i} falhou (404): {encoded_path[:50]}...")
+                    continue
+                    
+                response.raise_for_status()
+            except requests.exceptions.RequestException as e:
+                last_error = e
+                logger.debug(f"Tentativa {i} falhou: {e}")
+                continue
+        
+        # Se nenhuma tentativa funcionou
+        logger.warning(f"Pasta não encontrada após {len(unique_variations)} tentativas: {folder_path}")
+        if last_error:
+            logger.debug(f"Último erro: {last_error}")
+        return None
             
-            response.raise_for_status()
-            folder_data = response.json()
-            folder_id = folder_data.get("id")
-            
-            logger.debug(f"Folder ID obtido: {folder_id} para {folder_path}")
-            return folder_id
-        except requests.exceptions.RequestException as e:
-            logger.warning(f"Erro ao obter Folder ID para {folder_path}: {e}")
-            if hasattr(e, 'response') and e.response is not None:
-                logger.debug(f"Resposta do erro: {e.response.status_code} - {e.response.text[:200]}")
-            return None
     
     def list_mpp_files(self) -> List[Dict[str, Any]]:
         """
