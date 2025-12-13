@@ -102,7 +102,9 @@ class AzureDevOpsClient:
         """Faz requisição à API do Azure DevOps usando connection pooling"""
         from urllib.parse import quote
         # URL-encode o nome do projeto para evitar problemas com espaços e caracteres especiais
-        project_encoded = quote(self.project, safe='')
+        # Usa encoding UTF-8 explícito para caracteres acentuados (ç, ã, etc.)
+        # O Azure DevOps espera espaços como %20 e caracteres especiais codificados em UTF-8
+        project_encoded = quote(self.project, safe='', encoding='utf-8')
         url = f"{self.base_url}/{project_encoded}/_apis/{endpoint}"
         params = kwargs.pop('params', {})
         params['api-version'] = self.api_version
