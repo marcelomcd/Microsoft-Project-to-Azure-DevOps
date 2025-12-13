@@ -149,6 +149,7 @@ def process_files_sharepoint(
         # Verifica se deve processar baseado no histórico
         file_entry = history_service.get_file_info(filename)
         should_process = True
+        file_was_modified = True  # Assume modificado se não houver histórico
         
         if file_entry and last_modified_str:
             # Compara timestamps
@@ -160,6 +161,11 @@ def process_files_sharepoint(
                     last_sync = datetime.fromisoformat(last_sync_str.replace('Z', '+00:00'))
                     if last_modified <= last_sync:
                         should_process = False
+                        file_was_modified = False
+                    else:
+                        file_was_modified = True  # Arquivo foi modificado
+                else:
+                    file_was_modified = True  # Primeira vez processando
             except (ValueError, TypeError):
                 pass  # Se erro ao comparar, processa de qualquer forma
         
@@ -179,12 +185,16 @@ def process_files_sharepoint(
             temp_file = sharepoint_service.download_file(file_id)
             
             # Processa arquivo
-            logger.info(f"Processando arquivo: {filename}")
+            # update_existing=True apenas se arquivo foi modificado recentemente
+            # Isso garante que:
+            # - Se arquivo foi modificado → atualiza itens existentes
+            # - Se arquivo não foi modificado → apenas cria novos itens (não deveria chegar aqui, mas por segurança)
+            logger.info(f"Processando arquivo: {filename} (modificado: {file_was_modified})")
             process_result = file_processor.process_mpp_file(
                 file_path=temp_file,
                 original_filename=filename,  # Passa o nome original do SharePoint
-                update_existing=True,
-                skip_duplicates=True
+                update_existing=file_was_modified,  # Atualiza apenas se arquivo foi modificado
+                skip_duplicates=True  # Busca por nome exato antes de criar
             )
             
             if process_result["success"]:
