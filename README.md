@@ -16,7 +16,7 @@ Sistema automatizado para sincronizar arquivos `.mpp` (Microsoft Project) do Sha
 
 ---
 
-<a name="visao-geral"></a>
+<a id="visao-geral"></a>
 ## 🎯 Visão Geral
 
 ### Funcionalidades Principais
@@ -41,7 +41,7 @@ Sistema automatizado para sincronizar arquivos `.mpp` (Microsoft Project) do Sha
 
 ---
 
-<a name="arquitetura-do-sistema"></a>
+<a id="arquitetura-do-sistema"></a>
 ## 🏗️ Arquitetura do Sistema
 
 ### Fluxo de Execução
@@ -78,7 +78,7 @@ Azure DevOps (Work Items)
 
 ---
 
-<a name="pre-requisitos"></a>
+<a id="pre-requisitos"></a>
 ## 📋 Pré-requisitos
 
 - **Python 3.9+**
@@ -88,7 +88,7 @@ Azure DevOps (Work Items)
 
 ---
 
-<a name="instalacao"></a>
+<a id="instalacao"></a>
 ## 🛠️ Instalação
 
 ### Instalação Local (para testes)
@@ -111,7 +111,7 @@ cp env.example.txt .env
 
 ---
 
-<a name="configuracao"></a>
+<a id="configuracao"></a>
 ## ⚙️ Configuração
 
 ### Configuração Local (para testes)
@@ -263,7 +263,7 @@ Após configurar, execute a pipeline manualmente e verifique os logs:
 
 ---
 
-<a name="funcionamento"></a>
+<a id="funcionamento"></a>
 ## 🔄 Funcionamento
 
 ### Processo de Sincronização
@@ -340,7 +340,7 @@ O nome do arquivo `.mpp` deve seguir o padrão:
 
 ---
 
-<a name="estrutura-do-projeto"></a>
+<a id="estrutura-do-projeto"></a>
 ## 📁 Estrutura do Projeto
 
 ```
@@ -394,7 +394,7 @@ O nome do arquivo `.mpp` deve seguir o padrão:
 
 ---
 
-<a name="execucao"></a>
+<a id="execucao"></a>
 ## 🚀 Execução
 
 ### Execução Local (para testes)
@@ -427,7 +427,7 @@ O sistema suporta execução agendada via pipeline do Azure DevOps para processa
 
 ---
 
-<a name="troubleshooting"></a>
+<a id="troubleshooting"></a>
 ## 🔍 Troubleshooting
 
 ### Erro: "404 Client Error: Not Found"
@@ -487,7 +487,7 @@ O sistema suporta execução agendada via pipeline do Azure DevOps para processa
 
 ---
 
-<a name="referencia-rapida"></a>
+<a id="referencia-rapida"></a>
 ## 📖 Referência Rápida
 
 ### Comandos Úteis
