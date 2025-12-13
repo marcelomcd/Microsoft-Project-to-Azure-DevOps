@@ -350,12 +350,21 @@ class AzureDevOpsClient:
             return work_item
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Work Item {work_item_id} não encontrado (404) no projeto {self.project}")
                 return None
             error_msg = f"Erro HTTP ao buscar Work Item {work_item_id}: {e.response.status_code} - {e.response.text}"
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(error_msg)
             print(error_msg)
             raise Exception(error_msg)
         except Exception as e:
             error_msg = f"Erro ao buscar Work Item {work_item_id}: {str(e)}"
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(error_msg, exc_info=True)
             print(error_msg)
             raise Exception(error_msg)
     

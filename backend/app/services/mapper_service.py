@@ -1093,10 +1093,23 @@ class MapperService:
         Returns:
             True se existe, False caso contrário
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         try:
             work_item = self.devops_client.get_work_item_by_id(parent_id)
-            return work_item is not None
-        except Exception:
+            if work_item is None:
+                logger.warning(f"Work Item {parent_id} não encontrado (retornou None)")
+                return False
+            
+            # Verifica se é do tipo esperado (Feature, Epic, etc.)
+            work_item_type = work_item.fields.get('System.WorkItemType', '')
+            logger.debug(f"Work Item {parent_id} encontrado: tipo={work_item_type}, título={work_item.fields.get('System.Title', 'N/A')}")
+            return True
+        except Exception as e:
+            logger.error(f"Erro ao validar Work Item {parent_id}: {type(e).__name__}: {str(e)}")
+            import traceback
+            logger.debug(f"Traceback: {traceback.format_exc()}")
             return False
     
     def _determine_area_path(
