@@ -623,15 +623,17 @@ class AzureDevOpsClient:
                                 })
                                 break  # Remove apenas a primeira relação de parent encontrada
                     
-                    # Adiciona nova relação de parent
-                    fields.append({
-                        "op": "add",
-                        "path": "/relations/-",
-                        "value": {
-                            "rel": "System.LinkTypes.Hierarchy-Reverse",
-                            "url": f"{self.base_url}/{self.project}/_apis/wit/workitems/{parent_id}"
-                        }
-                    })
+                # Adiciona nova relação de parent
+                from urllib.parse import quote
+                project_encoded = quote(self.project, safe='', encoding='utf-8')
+                fields.append({
+                    "op": "add",
+                    "path": "/relations/-",
+                    "value": {
+                        "rel": "System.LinkTypes.Hierarchy-Reverse",
+                        "url": f"{self.base_url}/{project_encoded}/_apis/wit/workitems/{parent_id}"
+                    }
+                })
             
             if not fields:
                 # Nada para atualizar
