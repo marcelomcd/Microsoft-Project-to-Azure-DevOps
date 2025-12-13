@@ -13,8 +13,12 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
+# Permitir arquivos JAR e Java no diretório lib (necessários para parsing MPP)
+!lib/
+!lib/*.jar
+!lib/*.java
+!lib/*.class
 parts/
 sdist/
 var/
