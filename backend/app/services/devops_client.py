@@ -108,11 +108,24 @@ class AzureDevOpsClient:
     
     def _make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
         """Faz requisição à API do Azure DevOps usando connection pooling"""
-        from urllib.parse import quote
+        from urllib.parse import quote, unquote
         # URL-encode o nome do projeto para evitar problemas com espaços e caracteres especiais
         # Usa encoding UTF-8 explícito para caracteres acentuados (ç, ã, etc.)
         # O Azure DevOps espera espaços como %20 e caracteres especiais codificados em UTF-8
-        project_encoded = quote(self.project, safe='', encoding='utf-8')
+        # IMPORTANTE: Se o projeto já estiver codificado, decodifica primeiro para evitar codificação dupla
+        project_to_encode = self.project
+        try:
+            # Tenta decodificar para verificar se já está codificado
+            decoded = unquote(project_to_encode)
+            # Se decodificar resultar em algo diferente, significa que estava codificado
+            if decoded != project_to_encode and '%' in project_to_encode:
+                # Já estava codificado, usa o decodificado para recodificar corretamente
+                project_to_encode = decoded
+                print(f"DevOpsClient: AVISO - Projeto estava codificado, decodificando antes de recodificar")
+        except Exception:
+            pass  # Se falhar ao decodificar, assume que não está codificado
+        
+        project_encoded = quote(project_to_encode, safe='', encoding='utf-8')
         url = f"{self.base_url}/{project_encoded}/_apis/{endpoint}"
         params = kwargs.pop('params', {})
         params['api-version'] = self.api_version
