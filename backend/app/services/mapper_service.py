@@ -87,34 +87,20 @@ class MapperService:
         # Determina parent_feature_id se não fornecido
         parent_feature_id = self._resolve_parent_feature_id(parsed_data, parent_feature_id)
         
-        # VALIDAÇÃO CRÍTICA: Verifica se a Feature existe ANTES de processar
+        # Log informativo sobre a Feature (não bloqueia processamento)
         import logging
         logger = logging.getLogger(__name__)
         
         if parent_feature_id:
-            logger.info(f"🔍 Validando Feature {parent_feature_id} antes de processar...")
-            logger.info(f"   Projeto configurado: {self.devops_client.project}")
-            logger.info(f"   Org configurada: {self.devops_client.org}")
-            
-            if not self._validate_parent_exists(parent_feature_id):
-                error_msg = (
-                    f"❌ ERRO CRÍTICO: Feature {parent_feature_id} não foi encontrada no Azure DevOps!\n"
-                    f"   Projeto: {self.devops_client.project}\n"
-                    f"   Org: {self.devops_client.org}\n"
-                    f"   Verifique:\n"
-                    f"   1. Se a Feature {parent_feature_id} existe no projeto '{self.devops_client.project}'\n"
-                    f"   2. Se a variável AZURE_DEVOPS_PROJECT está configurada corretamente na pipeline\n"
-                    f"   3. Se o PAT tem permissão para ler Work Items no projeto\n"
-                    f"   4. Acesse: https://dev.azure.com/{self.devops_client.org}/{self.devops_client.project.replace(' ', '%20')}/_workitems/edit/{parent_feature_id}"
-                )
-                logger.error(error_msg)
-                result.errors.append(error_msg)
-                # Finaliza registro mesmo com erro
-                sync_log = self.sync_logger.finish_sync()
-                result.sync_log = sync_log
-                return result
+            logger.info(f"🔍 Processando com Feature {parent_feature_id}")
+            logger.info(f"   Projeto: {self.devops_client.project}")
+            logger.info(f"   Org: {self.devops_client.org}")
+            # Tenta validar mas não bloqueia se falhar (pode ser problema de permissão/cache)
+            if self._validate_parent_exists(parent_feature_id):
+                logger.info(f"✅ Feature {parent_feature_id} encontrada")
             else:
-                logger.info(f"✅ Feature {parent_feature_id} validada com sucesso!")
+                logger.warning(f"⚠️  Feature {parent_feature_id} não encontrada na validação inicial (pode ser cache/permissão)")
+                logger.warning(f"   Continuando processamento - itens serão buscados pelo nome exato dentro da Feature")
         else:
             logger.warning("⚠️  Nenhum parent_feature_id fornecido - User Stories e Tasks serão criadas sem parent")
         
@@ -505,17 +491,8 @@ class MapperService:
             item_map: Mapa de task_id -> work_item_id
             user_story_map: Mapa de task_id -> work_item_id (apenas User Stories)
         """
-        # Double check: valida que parent_feature_id existe
-        if parent_feature_id and not self._validate_parent_exists(parent_feature_id):
-            error_msg = f"Feature {parent_feature_id} não existe"
-            result.errors.append(error_msg)
-            self.sync_logger.log_failed_user_story(
-                title=title,
-                error=error_msg,
-                parent_id=parent_feature_id,
-                mpp_task_id=task_id
-            )
-            return
+        # Não valida Feature aqui - deixa o Azure DevOps retornar erro real se não existir
+        # A busca por título exato já funciona mesmo se a validação falhar
         
         work_item = WorkItemCreate(
             title=title,
