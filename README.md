@@ -570,7 +570,7 @@ Para problemas ou dúvidas:
 
 ---
 
-**Última atualização**: 13/12/2025  
-**Versão**: 1.0.2  
+**Última atualização**: 17/12/2025  
+**Versão**: 1.0.3  
 **Desenvolvido por**: Marcelo Macedo  
 **E-mail**: [marcelo.macedo@qualiit.com.br](mailto:marcelo.macedo@qualiit.com.br)
