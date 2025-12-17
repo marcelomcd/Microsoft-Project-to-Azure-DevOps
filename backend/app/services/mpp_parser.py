@@ -378,9 +378,24 @@ class MPPParser:
                 else:
                     parent_id = str(parent)
             
-            # Work
+            # Work - converte de segundos para horas
             work = task_data.get('work', '')
             work_hours = task_data.get('workHours', 0) or 0
+            
+            # Se work_hours não está disponível, converte work de segundos para horas
+            if work_hours == 0 and work:
+                try:
+                    # work está em segundos, converte para horas
+                    if isinstance(work, (int, float)):
+                        work_hours = float(work) / 3600.0  # Converte segundos para horas
+                    elif isinstance(work, str):
+                        # Tenta extrair número da string
+                        import re
+                        numbers = re.findall(r'\d+\.?\d*', work)
+                        if numbers:
+                            work_hours = float(numbers[0]) / 3600.0
+                except (ValueError, TypeError):
+                    work_hours = 0
             
             # Tipo e modo
             task_type = task_data.get('type', None)

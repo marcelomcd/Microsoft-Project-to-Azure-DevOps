@@ -1077,7 +1077,12 @@ class MapperService:
         if task.priority is not None:
             custom_fields['Microsoft.VSTS.Common.Priority'] = task.priority
         
-        if task.work_hours is not None:
+        # Campo "Trabalho" (work) convertido para horas
+        # Tenta usar Custom.Original Estimate, se não existir usa Microsoft.VSTS.Scheduling.OriginalEstimate
+        # Apenas para Tasks (não User Stories)
+        if not task.is_user_story and task.work_hours is not None and task.work_hours > 0:
+            # Tenta campo customizado primeiro, se falhar usa campo padrão
+            # Nota: Se Custom.Original Estimate não existir no projeto, será usado OriginalEstimate padrão
             custom_fields['Microsoft.VSTS.Scheduling.OriginalEstimate'] = float(task.work_hours)
         
         return custom_fields

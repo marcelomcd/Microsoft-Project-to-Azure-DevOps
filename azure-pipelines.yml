@@ -1,9 +1,11 @@
 # Pipeline do Azure DevOps para sincronização agendada de arquivos .mpp
 # 
 # Esta pipeline:
-# - Executa de segunda a sexta-feira às 6:30h (horário de Brasília = 9:30h UTC)
+# - Executa de segunda a sexta-feira às 6:00h, 12:00h e 18:00h (horário de Brasília)
+# - Verifica se houve alterações nos arquivos antes de processar
 # - Processa arquivos .mpp de um diretório configurado ou SharePoint
 # - Sincroniza User Stories e Tasks com o Azure DevOps
+# - Inclui horas de trabalho (Original Estimate) nas Tasks
 # - Gera logs detalhados e relatórios
 #
 # Variáveis necessárias (configurar em Library ou Pipeline Variables):
@@ -15,16 +17,35 @@
 trigger: none  # Pipeline não é acionada por commits
 
 schedules:
-  # Executa de segunda a sexta-feira às 6:30h horário de Brasília (9:30h UTC)
-  # Nota: Azure DevOps usa UTC, então 6:30h BRT = 9:30h UTC
+  # Executa de segunda a sexta-feira às 6:00h, 12:00h e 18:00h horário de Brasília
+  # Nota: Azure DevOps usa UTC, então:
+  # - 6:00h BRT = 9:00h UTC (UTC-3 no horário padrão, UTC-2 no horário de verão)
+  # - 12:00h BRT = 15:00h UTC
+  # - 18:00h BRT = 21:00h UTC
   # Formato cron: minuto hora dia mês dia_da_semana (1=segunda, 5=sexta)
-  - cron: "30 9 * * 1-5"  # 9:30h UTC = 6:30h BRT, segunda a sexta-feira
-    displayName: Sincronização - Segunda a Sexta às 6:30h BRT
+  - cron: "0 9 * * 1-5"  # 9:00h UTC = 6:00h BRT, segunda a sexta-feira
+    displayName: Sincronização - Segunda a Sexta às 6:00h BRT
     branches:
       include:
         - main
         - master
-    always: true  # Executa mesmo sem commits recentes
+    always: false  # Executa apenas se houver alterações ou commits recentes
+  
+  - cron: "0 15 * * 1-5"  # 15:00h UTC = 12:00h BRT, segunda a sexta-feira
+    displayName: Sincronização - Segunda a Sexta às 12:00h BRT
+    branches:
+      include:
+        - main
+        - master
+    always: false  # Executa apenas se houver alterações ou commits recentes
+  
+  - cron: "0 21 * * 1-5"  # 21:00h UTC = 18:00h BRT, segunda a sexta-feira
+    displayName: Sincronização - Segunda a Sexta às 18:00h BRT
+    branches:
+      include:
+        - main
+        - master
+    always: false  # Executa apenas se houver alterações ou commits recentes
 
 pool:
   vmImage: 'ubuntu-latest'  # Ou 'windows-latest' dependendo do ambiente
