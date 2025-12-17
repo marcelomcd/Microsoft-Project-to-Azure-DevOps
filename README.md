@@ -542,8 +542,9 @@ cat backend/logs/sync_history.json
 ### Horário de Execução
 
 - **Agendamento**: Segunda a sexta-feira
-- **Horário**: 6:30h BRT (9:30h UTC)
-- **Frequência**: Diária (apenas dias úteis)
+- **Horário**: 6:00h, 12:00h e 18:00h BRT (9:00h, 15:00h e 21:00h UTC)
+- **Frequência**: Três vezes ao dia (apenas dias úteis)
+- **Verificação de Alterações**: Processa apenas arquivos modificados
 
 ### Funcionalidades Técnicas
 
