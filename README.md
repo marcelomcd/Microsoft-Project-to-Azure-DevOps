@@ -21,7 +21,7 @@ Sistema automatizado para sincronizar arquivos `.mpp` (Microsoft Project) do Sha
 
 ### Funcionalidades Principais
 
-- ✅ **Sincronização Automatizada**: Pipeline agendada executa de segunda a sexta-feira às 6:30h BRT
+- ✅ **Sincronização Automatizada**: Pipeline agendada executa diariamente às 6:30h BRT
 - ✅ **Verificação de Alterações**: Processa apenas arquivos modificados desde a última sincronização
 - ✅ **Integração SharePoint**: Busca e processa arquivos `.mpp` automaticamente do SharePoint
 - ✅ **Identificação Automática**: Extrai Feature ID dos primeiros 5 dígitos do nome do arquivo
@@ -142,10 +142,8 @@ API_TIMEOUT=30
 ### Configuração da Pipeline Azure DevOps
 
 A pipeline está configurada para executar:
-- **Agendamento**: Segunda a sexta-feira às 6:00h, 12:00h e 18:00h BRT
-  - 6:00h BRT = 9:00h UTC
-  - 12:00h BRT = 15:00h UTC
-  - 18:00h BRT = 21:00h UTC
+- **Agendamento**: Diariamente às 6:30h BRT
+  - 6:30h BRT = 9:30h UTC
 - **Verificação de Alterações**: Processa apenas arquivos modificados desde a última sincronização
 - **Ambiente**: Ubuntu Latest
 - **Python**: 3.9
@@ -274,7 +272,7 @@ Após configurar, execute a pipeline manualmente e verifique os logs:
 
 ### Processo de Sincronização
 
-1. **Agendamento**: Pipeline executa automaticamente de segunda a sexta às 6:00h, 12:00h e 18:00h BRT
+1. **Agendamento**: Pipeline executa automaticamente diariamente às 6:30h BRT
    - Verifica se houve alterações nos arquivos antes de processar
    - Processa apenas arquivos modificados desde a última sincronização
 
@@ -541,9 +539,9 @@ cat backend/logs/sync_history.json
 
 ### Horário de Execução
 
-- **Agendamento**: Segunda a sexta-feira
-- **Horário**: 6:00h, 12:00h e 18:00h BRT (9:00h, 15:00h e 21:00h UTC)
-- **Frequência**: Três vezes ao dia (apenas dias úteis)
+- **Agendamento**: Diariamente
+- **Horário**: 6:30h BRT (9:30h UTC)
+- **Frequência**: Uma vez por dia
 - **Verificação de Alterações**: Processa apenas arquivos modificados
 
 ### Funcionalidades Técnicas
