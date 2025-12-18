@@ -571,6 +571,6 @@ Para problemas ou dúvidas:
 ---
 
 **Última atualização**: 17/12/2025  
-**Versão**: 1.0.3  
+**Versão**: 1.0.4
 **Desenvolvido por**: Marcelo Macedo  
 **E-mail**: [marcelo.macedo@qualiit.com.br](mailto:marcelo.macedo@qualiit.com.br)
