@@ -580,7 +580,8 @@ class AzureDevOpsClient:
         target_date: Optional[datetime] = None,
         start_date: Optional[datetime] = None,
         custom_fields: Optional[Dict[str, Any]] = None,
-        parent_id: Optional[int] = None
+        parent_id: Optional[int] = None,
+        state: Optional[str] = None
     ) -> Optional[WorkItemResponse]:
         """Atualiza um Work Item existente no Azure DevOps"""
         try:
@@ -629,6 +630,14 @@ class AzureDevOpsClient:
                         "value": field_value
                     })
             
+            # Atualiza state se fornecido (independente de custom_fields)
+            if state:
+                fields.append({
+                    "op": "replace",
+                    "path": "/fields/System.State",
+                    "value": state
+                })
+            
             # Atualiza parent se fornecido
             if parent_id is not None:
                 # Primeiro, obtém o Work Item atual para verificar relações existentes
@@ -663,23 +672,41 @@ class AzureDevOpsClient:
             # PATCH para atualização
             endpoint = f'wit/workitems/{work_item_id}'
             
-            response = self._make_request(
-                'PATCH',
-                endpoint,
-                json=fields,
-                headers={'Content-Type': 'application/json-patch+json'}
-            )
-            
-            item = self._safe_json_parse(response)
-            return WorkItemResponse(
-                id=item['id'],
-                rev=item['rev'],
-                fields=item.get('fields', {}),
-                relations=item.get('relations', None),
-                url=item.get('url', '')
-            )
+            try:
+                response = self._make_request(
+                    'PATCH',
+                    endpoint,
+                    json=fields,
+                    headers={'Content-Type': 'application/json-patch+json'}
+                )
+                
+                item = self._safe_json_parse(response)
+                return WorkItemResponse(
+                    id=item['id'],
+                    rev=item['rev'],
+                    fields=item.get('fields', {}),
+                    relations=item.get('relations', None),
+                    url=item.get('url', '')
+                )
+            except requests.exceptions.HTTPError as e:
+                # Captura erro detalhado para debug
+                error_detail = str(e)
+                if hasattr(e, 'response') and e.response is not None:
+                    try:
+                        error_body = e.response.text
+                        print(f"DevOpsClient: Erro detalhado ao atualizar Work Item {work_item_id}:")
+                        print(f"  Status: {e.response.status_code}")
+                        print(f"  Resposta: {error_body[:500]}")
+                        print(f"  Campos enviados (primeiros 5): {fields[:5]}")
+                        if len(fields) > 5:
+                            print(f"  ... e mais {len(fields) - 5} campos")
+                    except:
+                        pass
+                raise
         except Exception as e:
             print(f"Erro ao atualizar Work Item {work_item_id}: {e}")
+            import traceback
+            traceback.print_exc()
             raise
     
     def get_project_work_items(self, project_id: Optional[str] = None) -> List[WorkItemResponse]:
