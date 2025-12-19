@@ -319,8 +319,12 @@ class MPPParser:
             if isinstance(duration, dict):
                 duration = duration.get('duration', '')
             
-            # Percentual completo
-            percent_complete = task_data.get('percentageComplete', 0) or 0
+            # Percentual completo - tenta ambos os nomes de campo e converte para float
+            percent_complete = task_data.get('percent_complete') or task_data.get('percentageComplete', 0) or 0
+            if isinstance(percent_complete, (int, float)):
+                percent_complete = float(percent_complete)
+            else:
+                percent_complete = 0.0
             
             # Recursos - pode estar em 'resources' ou 'assignments'
             resource_names = []
@@ -401,6 +405,89 @@ class MPPParser:
             task_type = task_data.get('type', None)
             task_mode = 'Summary' if summary else task_data.get('taskMode', 'Fixed Duration')
             
+            # Status - Calcula baseado nos campos disponíveis do MPXJ
+            # O MPXJ não exporta "status" diretamente, então calculamos baseado em:
+            # - percent_complete: indica conclusão
+            # - finish_variance: indica atraso (positivo = atrasada, negativo/zero = no prazo)
+            # - actual_finish: indica se foi concluída
+            # - start/finish dates: para determinar se é tarefa futura
+            status = None
+            
+            # Primeiro, tenta buscar campo 'status' ou 'state' diretamente (caso exista)
+            if 'status' in task_data:
+                status = task_data.get('status')
+            elif 'state' in task_data:
+                status = task_data.get('state')
+            # Tenta campos customizados
+            elif 'customFields' in task_data:
+                custom_fields = task_data.get('customFields', [])
+                if isinstance(custom_fields, list):
+                    for cf in custom_fields:
+                        if isinstance(cf, dict):
+                            field_name = cf.get('name', '').lower()
+                            if 'status' in field_name or 'estado' in field_name:
+                                status = cf.get('value')
+                                break
+            
+            # Se não encontrou status direto, calcula baseado nos campos disponíveis
+            if not status:
+                finish_variance = task_data.get('finish_variance', 0)
+                # Converte para int se necessário
+                if isinstance(finish_variance, (int, float)):
+                    finish_variance = int(finish_variance)
+                else:
+                    finish_variance = 0
+                    
+                actual_finish = task_data.get('actual_finish')
+                finish = task_data.get('finish')
+                start = task_data.get('start')
+                from datetime import datetime
+                
+                # Converte strings de data para datetime para comparação
+                today = datetime.now()
+                finish_date = None
+                start_date = None
+                
+                if finish:
+                    try:
+                        finish_date = self._parse_json_date(finish)
+                    except:
+                        pass
+                if start:
+                    try:
+                        start_date = self._parse_json_date(start)
+                    except:
+                        pass
+                
+                # Lógica de determinação de status:
+                # 1. Se percent_complete = 100% ou tem actual_finish -> "Concluída"
+                if percent_complete >= 100.0:
+                    status = "Concluída"
+                elif actual_finish:
+                    status = "Concluída"
+                # 2. Se ainda não começou (start_date no futuro) -> "Tarefa futura"
+                elif start_date and start_date > today:
+                    status = "Tarefa futura"
+                # 3. Se finish_variance > 0 (atraso) -> "Atrasada"
+                elif finish_variance > 0:
+                    status = "Atrasada"
+                # 4. Se finish_date no passado e não está concluída -> "Atrasada"
+                elif finish_date and finish_date < today and percent_complete < 100:
+                    status = "Atrasada"
+                # 5. Caso contrário -> "No Prazo"
+                else:
+                    status = "No Prazo"
+            
+            # Converte para string se necessário e normaliza
+            if status is not None:
+                status = str(status).strip() if isinstance(status, str) else str(status)
+                if not status or status.lower() == 'none':
+                    status = None
+            
+            # Debug: mostra status calculado/encontrado
+            if status:
+                print(f"MPPParser: Task '{name[:50]}' -> status: '{status}'")
+            
             # Determina se é User Story ou Task baseado em "Nomes dos recursos"
             # REGRA: 
             # - Se "Nomes dos recursos" estiver vazio ou None → User Story
@@ -431,7 +518,8 @@ class MPPParser:
                 work_hours=work_hours,
                 predecessors=predecessors_str,
                 type=str(task_type) if task_type else None,
-                task_mode=task_mode
+                task_mode=task_mode,
+                status=status
             )
         except Exception as e:
             print(f"Erro ao parsear tarefa do JSON: {e}")
