@@ -23,6 +23,7 @@ class MPPTask(BaseModel):
     predecessors: Optional[str] = None
     type: Optional[str] = None
     task_mode: Optional[str] = None
+    status: Optional[str] = None  # Status da tarefa no Microsoft Project (ex: "Concluída", "Tarefa Futura", "No Prazo", "Atrasada", "Removed")
 
 class MPPProject(BaseModel):
     """Representa um projeto do arquivo .mpp"""
