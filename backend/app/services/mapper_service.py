@@ -309,10 +309,11 @@ class MapperService:
         
         Para cada Task:
         1. Valida dados
-        2. Determina parent (User Story ou Feature)
-        3. Verifica duplicatas (se skip_duplicates=True)
-        4. Atualiza existente ou cria nova
-        5. Registra operação
+        2. Filtra tasks com status "Removed" (não serão processadas)
+        3. Determina parent (User Story ou Feature)
+        4. Verifica duplicatas (se skip_duplicates=True)
+        5. Atualiza existente ou cria nova
+        6. Registra operação
         
         Args:
             parsed_data: Dados parseados
@@ -329,6 +330,12 @@ class MapperService:
         sorted_tasks = sorted(parsed_data.tasks, key=lambda t: (t.level or 0, t.id or ""))
         
         for task in sorted_tasks:
+            # Filtra tasks com status "Removed" - não serão processadas
+            if task.status:
+                status_lower = task.status.strip().lower()
+                if status_lower in ['removed', 'removida', 'removido']:
+                    print(f"MapperService: Task '{task.name}' ignorada (status: {task.status})")
+                    continue
             title = sanitize_title(task.name)
             task_id = task.id or task.name
             
@@ -393,7 +400,10 @@ class MapperService:
                         assigned_to=self._get_assigned_to(task),
                         result=result,
                         item_map=item_map,
-                        correct_parent_id=parent_id if needs_reparent else None
+                        correct_parent_id=parent_id if needs_reparent else None,
+                        devops_state=self._map_status_to_devops_state(task.status),
+                        start_date=task.start_date,
+                        target_date=task.finish_date
                     )
                 else:
                     # Mesmo sem update_existing, re-vincula se necessário
@@ -424,7 +434,8 @@ class MapperService:
                     iteration_path=iteration_path,
                     assigned_to=self._get_assigned_to(task),
                     result=result,
-                    item_map=item_map
+                    item_map=item_map,
+                    devops_state=self._map_status_to_devops_state(task.status)
                 )
     
     # Métodos auxiliares para User Stories
@@ -881,7 +892,8 @@ class MapperService:
         iteration_path: str,
         assigned_to: Optional[str],
         result: ConversionResult,
-        item_map: Dict[str, Optional[int]]
+        item_map: Dict[str, Optional[int]],
+        devops_state: Optional[str] = None
     ):
         """
         Cria uma nova Task no Azure DevOps.
@@ -896,12 +908,17 @@ class MapperService:
             assigned_to: Email do responsável
             result: Resultado da conversão (será atualizado)
             item_map: Mapa de task_id -> work_item_id
+            devops_state: State do Azure DevOps (mapeado do status do Project)
         """
         # Não valida parent aqui - deixa o Azure DevOps retornar erro real se não existir
         # A busca por título exato já funciona mesmo se a validação falhar
         
         # Prepara campos customizados
         custom_fields = self._prepare_custom_fields(task)
+        
+        # NÃO adiciona System.State em custom_fields - será enviado via endpoint separadamente se necessário
+        # Para criação, o state padrão será usado (geralmente "New")
+        # O state pode ser atualizado em uma segunda chamada se necessário
         
         work_item = WorkItemCreate(
             title=title,
@@ -948,7 +965,10 @@ class MapperService:
         assigned_to: Optional[str],
         result: ConversionResult,
         item_map: Dict[str, Optional[int]],
-        correct_parent_id: Optional[int] = None
+        correct_parent_id: Optional[int] = None,
+        devops_state: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        target_date: Optional[datetime] = None
     ):
         """
         Atualiza uma Task existente no Azure DevOps.
@@ -960,22 +980,55 @@ class MapperService:
             existing_id: ID da Task existente
             assigned_to: Email do responsável
             correct_parent_id: ID do parent correto (se precisa re-vincular)
+            devops_state: State do Azure DevOps (mapeado do status do Project)
+            start_date: Data de início (opcional, sobrescreve task.start_date)
+            target_date: Data de término (opcional, sobrescreve task.finish_date)
             result: Resultado da conversão (será atualizado)
             item_map: Mapa de task_id -> work_item_id
         """
         try:
             custom_fields = self._prepare_custom_fields(task)
             
-            updated = self.devops_client.update_work_item(
-                work_item_id=existing_id,
-                title=title,
-                description=task.notes,
-                assigned_to=assigned_to,
-                start_date=task.start_date,
-                target_date=task.finish_date,
-                custom_fields=custom_fields if custom_fields else None,
-                parent_id=correct_parent_id
-            )
+            # NÃO adiciona System.State em custom_fields - será enviado separadamente via parâmetro state
+            # O campo System.State não deve estar em custom_fields porque é um campo padrão
+            
+            # Usa start_date/target_date fornecidos ou os da task
+            update_start_date = start_date if start_date is not None else task.start_date
+            update_target_date = target_date if target_date is not None else task.finish_date
+            
+            # Prepara parâmetros - só envia campos válidos
+            update_params = {
+                "work_item_id": existing_id,
+                "title": title,
+            }
+            
+            # Atualiza description apenas se não for None
+            if task.notes is not None:
+                update_params["description"] = task.notes
+            
+            # Atualiza assigned_to se fornecido
+            if assigned_to:
+                update_params["assigned_to"] = assigned_to
+            
+            # Atualiza datas se fornecidas
+            if update_start_date:
+                update_params["start_date"] = update_start_date
+            if update_target_date:
+                update_params["target_date"] = update_target_date
+            
+            # Atualiza custom_fields se houver
+            if custom_fields:
+                update_params["custom_fields"] = custom_fields
+            
+            # Atualiza parent_id apenas se fornecido (None = não atualizar parent)
+            if correct_parent_id is not None:
+                update_params["parent_id"] = correct_parent_id
+            
+            # Atualiza state se fornecido - SEMPRE atualiza se tivermos um status válido
+            if devops_state:
+                update_params["state"] = devops_state
+            
+            updated = self.devops_client.update_work_item(**update_params)
             if updated:
                 result.updated_tasks += 1
                 result.work_items.append(updated)
@@ -1057,6 +1110,43 @@ class MapperService:
         """
         if task.resource_name:
             return get_email_by_resource_name(task.resource_name)
+        return None
+    
+    def _map_status_to_devops_state(self, status: Optional[str]) -> Optional[str]:
+        """
+        Mapeia status do Microsoft Project para State do Azure DevOps.
+        
+        Regras de mapeamento:
+        - Project "Concluída" -> Azure "Closed" (baseado nas opções disponíveis no DevOps)
+        - Project "Tarefa futura" -> Azure "New"
+        - Project "No Prazo" ou "Atrasada" -> Azure "Active"
+        - Status "Removed" -> None (não será processado)
+        
+        Args:
+            status: Status da tarefa no Microsoft Project
+            
+        Returns:
+            State do Azure DevOps ou None se status for "Removed" ou desconhecido
+        """
+        if not status:
+            return None
+        
+        status_lower = status.strip().lower()
+        
+        # Status "Removed" não será processado
+        if status_lower in ['removed', 'removida', 'removido']:
+            return None
+        
+        # Mapeamento conforme regras (baseado nas opções do Azure DevOps: New, Active, Closed, Removed)
+        if status_lower in ['concluída', 'concluida', 'concluído', 'concluido', 'completed', 'finished', 'conclu']:
+            return "Closed"  # Usa "Closed" que é a opção disponível no DevOps (equivalente a Resolved)
+        elif status_lower in ['tarefa futura', 'futura', 'future', 'not started', 'tarefa futura']:
+            return "New"
+        elif status_lower in ['no prazo', 'no-prazo', 'em andamento', 'in progress', 'active', 'atrasada', 'atrasado', 'late', 'on time', 'no prazo']:
+            return "Active"
+        
+        # Se não encontrou mapeamento específico, retorna None (não atualiza state)
+        print(f"MapperService: Status '{status}' não mapeado, usando None")
         return None
     
     def _prepare_custom_fields(self, task: MPPTask) -> Dict[str, Any]:
@@ -1203,4 +1293,3 @@ class MapperService:
         
         from app.config import settings
         return f"{settings.AZURE_DEVOPS_PROJECT}\\{parsed_data.project.name}"
-
