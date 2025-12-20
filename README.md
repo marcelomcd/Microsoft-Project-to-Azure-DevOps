@@ -21,7 +21,7 @@ Sistema automatizado para sincronizar arquivos `.mpp` (Microsoft Project) do Sha
 
 ### Funcionalidades Principais
 
-- ✅ **Sincronização Automatizada**: Pipeline agendada executa de segunda a sexta-feira às 6:00h, 12:00h e 18:00h BRT
+- ✅ **Sincronização Automatizada**: Pipeline agendada executa de segunda a sexta-feira às 6:30h BRT
 - ✅ **Verificação de Alterações**: Processa apenas arquivos modificados desde a última sincronização
 - ✅ **Integração SharePoint**: Busca e processa arquivos `.mpp` automaticamente do SharePoint
 - ✅ **Identificação Automática**: Extrai Feature ID dos primeiros 5 dígitos do nome do arquivo
