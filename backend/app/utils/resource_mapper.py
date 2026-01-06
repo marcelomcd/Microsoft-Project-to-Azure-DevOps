@@ -27,6 +27,7 @@ RESOURCE_EMAIL_MAP: Dict[str, str] = {
     "Josias Afelis": "josias.afelis@qualiit.com.br",
     "Kayque Santos": "kayque.santos@qualiit.com.br",
     "Lucas Mendes": "lucas.mendes@qualiit.com.br",
+    "Luis Eduardo": "luis.lima@qualiit.com.br",
     "Luiz Sousa": "luiz.sousa@qualiit.com.br",
     "Marcelo Macedo": "marcelo.macedo@qualiit.com.br",
     "Marcelo Severo": "marcelo.severo@qualiit.com.br",
