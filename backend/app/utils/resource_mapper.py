@@ -39,6 +39,7 @@ RESOURCE_EMAIL_MAP: Dict[str, str] = {
     "Paulo Pazin": "paulo.pazin@qualiit.com.br",
     "Pedro Pilz - Quali IT": "pedro.pilz@qualiit.com.br",
     "Thatiane Carrijo": "thatiane.carrijo@qualiit.com.br",
+    "Tiago Oliveira": "tiago.oliveira@qualiit.com.br",
     "Vanessa Monteiro": "vanessa.monteiro@qualiit.com.br",
     "Victor Alves": "victor.alves@qualiit.com.br",
     "Vinicius Fava": "vinicius.fava@qualiit.com.br",

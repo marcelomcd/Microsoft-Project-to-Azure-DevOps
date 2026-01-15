@@ -973,6 +973,10 @@ class MapperService:
         """
         Atualiza uma Task existente no Azure DevOps.
         
+        IMPORTANTE: Se a Task estiver com status "Closed" no Azure DevOps, 
+        o status NÃO será alterado, mesmo que o arquivo .mpp tenha outro status.
+        Isso evita reabrir Tasks que já foram concluídas.
+        
         Args:
             task: Dados da Task do MPP
             title: Título sanitizado
@@ -987,6 +991,27 @@ class MapperService:
             item_map: Mapa de task_id -> work_item_id
         """
         try:
+            # Verifica o estado atual da Task no Azure DevOps
+            current_task = self.devops_client.get_work_item_by_id(existing_id, use_cache=False)
+            current_state = None
+            if current_task and current_task.fields:
+                current_state = current_task.fields.get('System.State', '')
+            
+            # REGRA CRÍTICA: Se a Task está "Closed" no Azure DevOps, NÃO altera o status
+            # mesmo que o arquivo .mpp tenha outro status (evita reabrir Tasks concluídas)
+            should_update_state = True
+            if current_state and current_state.lower() == 'closed':
+                if devops_state and devops_state.lower() != 'closed':
+                    print(f"MapperService: Task '{title}' (ID: {existing_id}) está 'Closed' no Azure DevOps. "
+                          f"Status do MPP ('{task.status}' -> '{devops_state}') será ignorado para evitar reabrir a Task.")
+                    should_update_state = False
+                elif devops_state and devops_state.lower() == 'closed':
+                    # Se ambos estão Closed, pode atualizar (mantém Closed)
+                    should_update_state = True
+                else:
+                    # Se não há devops_state do MPP, não atualiza
+                    should_update_state = False
+            
             custom_fields = self._prepare_custom_fields(task)
             
             # NÃO adiciona System.State em custom_fields - será enviado separadamente via parâmetro state
@@ -1024,8 +1049,8 @@ class MapperService:
             if correct_parent_id is not None:
                 update_params["parent_id"] = correct_parent_id
             
-            # Atualiza state se fornecido - SEMPRE atualiza se tivermos um status válido
-            if devops_state:
+            # Atualiza state apenas se permitido (não atualiza se Task está Closed e MPP tem outro status)
+            if devops_state and should_update_state:
                 update_params["state"] = devops_state
             
             updated = self.devops_client.update_work_item(**update_params)
