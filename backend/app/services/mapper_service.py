@@ -1032,8 +1032,15 @@ class MapperService:
                 update_params["description"] = task.notes
             
             # Atualiza assigned_to se fornecido
-            if assigned_to:
+            # Se assigned_to for None e o recurso for "Cliente", envia string vazia para remover responsável
+            if assigned_to is not None:
                 update_params["assigned_to"] = assigned_to
+            elif task.resource_name:
+                # Verifica se o recurso contém "Cliente" e assigned_to é None (deixar em branco)
+                resource_lower = task.resource_name.lower().strip()
+                if 'cliente' in resource_lower:
+                    # Recurso é "Cliente" e assigned_to é None -> remove responsável
+                    update_params["assigned_to"] = ""
             
             # Atualiza datas se fornecidas
             if update_start_date:
@@ -1127,13 +1134,21 @@ class MapperService:
         """
         Obtém email do responsável pela Task.
         
+        REGRA ESPECIAL: Se o nome do recurso contém "Cliente" (ex: "Cliente", "Cliente [1]", "Cliente [2]"),
+        retorna None para deixar o responsável em branco ("No one selected").
+        
         Args:
             task: Task do MPP
             
         Returns:
-            Email do responsável ou None
+            Email do responsável ou None (se for Cliente ou não houver recurso)
         """
         if task.resource_name:
+            # Verifica se o recurso contém "Cliente" (case-insensitive)
+            resource_lower = task.resource_name.lower().strip()
+            if 'cliente' in resource_lower:
+                print(f"MapperService: Recurso '{task.resource_name}' contém 'Cliente'. Deixando responsável em branco.")
+                return None
             return get_email_by_resource_name(task.resource_name)
         return None
     

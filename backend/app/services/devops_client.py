@@ -601,12 +601,23 @@ class AzureDevOpsClient:
                     "value": description
                 })
             
-            if assigned_to:
-                fields.append({
-                    "op": "replace",
-                    "path": "/fields/System.AssignedTo",
-                    "value": assigned_to
-                })
+            # assigned_to pode ser None para remover responsável (quando recurso é "Cliente")
+            # Verifica se assigned_to foi explicitamente fornecido (não apenas None padrão)
+            if assigned_to is not None:
+                if assigned_to == "":
+                    # String vazia = remover responsável
+                    fields.append({
+                        "op": "replace",
+                        "path": "/fields/System.AssignedTo",
+                        "value": None
+                    })
+                else:
+                    # Email válido = definir responsável
+                    fields.append({
+                        "op": "replace",
+                        "path": "/fields/System.AssignedTo",
+                        "value": assigned_to
+                    })
             
             if start_date:
                 fields.append({
