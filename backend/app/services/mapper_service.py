@@ -973,9 +973,9 @@ class MapperService:
         """
         Atualiza uma Task existente no Azure DevOps.
         
-        IMPORTANTE: Se a Task estiver com status "Closed" no Azure DevOps, 
+        IMPORTANTE: Se a Task estiver com status "Closed", "Removed" ou "Resolved" no Azure DevOps, 
         o status NÃO será alterado, mesmo que o arquivo .mpp tenha outro status.
-        Isso evita reabrir Tasks que já foram concluídas.
+        Isso evita reabrir Tasks que já foram concluídas, removidas ou resolvidas.
         
         Args:
             task: Dados da Task do MPP
@@ -997,20 +997,25 @@ class MapperService:
             if current_task and current_task.fields:
                 current_state = current_task.fields.get('System.State', '')
             
-            # REGRA CRÍTICA: Se a Task está "Closed" no Azure DevOps, NÃO altera o status
-            # mesmo que o arquivo .mpp tenha outro status (evita reabrir Tasks concluídas)
+            # REGRA CRÍTICA: Se a Task está "Closed", "Removed" ou "Resolved" no Azure DevOps, 
+            # NÃO altera o status mesmo que o arquivo .mpp tenha outro status.
+            # Isso evita reabrir Tasks que já foram concluídas, removidas ou resolvidas.
             should_update_state = True
-            if current_state and current_state.lower() == 'closed':
-                if devops_state and devops_state.lower() != 'closed':
-                    print(f"MapperService: Task '{title}' (ID: {existing_id}) está 'Closed' no Azure DevOps. "
-                          f"Status do MPP ('{task.status}' -> '{devops_state}') será ignorado para evitar reabrir a Task.")
-                    should_update_state = False
-                elif devops_state and devops_state.lower() == 'closed':
-                    # Se ambos estão Closed, pode atualizar (mantém Closed)
-                    should_update_state = True
-                else:
-                    # Se não há devops_state do MPP, não atualiza
-                    should_update_state = False
+            protected_states = ['closed', 'removed', 'resolved']
+            
+            if current_state:
+                current_state_lower = current_state.lower()
+                if current_state_lower in protected_states:
+                    if devops_state and devops_state.lower() not in protected_states:
+                        print(f"MapperService: Task '{title}' (ID: {existing_id}) está '{current_state}' no Azure DevOps. "
+                              f"Status do MPP ('{task.status}' -> '{devops_state}') será ignorado para evitar alterar o status protegido.")
+                        should_update_state = False
+                    elif devops_state and devops_state.lower() == current_state_lower:
+                        # Se ambos têm o mesmo status protegido, pode atualizar (mantém o status)
+                        should_update_state = True
+                    else:
+                        # Se não há devops_state do MPP ou é diferente, não atualiza
+                        should_update_state = False
             
             custom_fields = self._prepare_custom_fields(task)
             
@@ -1201,8 +1206,8 @@ class MapperService:
         """
         custom_fields = {}
         
-        if task.percent_complete is not None:
-            custom_fields['Microsoft.VSTS.Scheduling.CompletedWork'] = float(task.percent_complete)
+        # NOTA: O campo CompletedWork (Horas Consumidas) NÃO deve ser preenchido pelo script.
+        # Este campo é gerenciado manualmente no Azure DevOps.
         
         if task.priority is not None:
             custom_fields['Microsoft.VSTS.Common.Priority'] = task.priority
