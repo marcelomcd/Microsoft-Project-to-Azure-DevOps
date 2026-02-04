@@ -27,7 +27,7 @@ schedules:
       include:
         - main
         - master
-    always: false  # Executa apenas se houver alterações ou commits recentes
+    always: true
 
 pool:
   vmImage: 'ubuntu-latest'  # Ou 'windows-latest' dependendo do ambiente
