@@ -52,6 +52,8 @@ steps:
     displayName: 'Configurar Python $(PYTHON_VERSION)'
     inputs:
       versionSpec: '$(PYTHON_VERSION)'
+      architecture: 'x64'
+      disableDownloadFromRegistry: true
       addToPath: true
 
   # Step 3: Setup Java JDK
