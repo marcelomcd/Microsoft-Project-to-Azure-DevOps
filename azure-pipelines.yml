@@ -48,11 +48,14 @@ steps:
     fetchDepth: 1
 
   # Step 2: Setup Python
+  # Opcional: configure a variável GITHUB_ACCESS_TOKEN (PAT do GitHub) em Pipeline Variables
+  # para evitar o limite de download anônimo do GitHub ao baixar releases do Python.
   - task: UsePythonVersion@0
     displayName: 'Configurar Python $(PYTHON_VERSION)'
     inputs:
       versionSpec: '$(PYTHON_VERSION)'
       addToPath: true
+      githubToken: $(GITHUB_ACCESS_TOKEN)
 
   # Step 3: Setup Java JDK
   - task: JavaToolInstaller@0

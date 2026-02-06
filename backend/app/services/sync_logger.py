@@ -1,4 +1,8 @@
-"""Serviço para registro de alterações na sincronização"""
+"""Serviço para registro de alterações na sincronização.
+
+Gera relatórios apenas em HTML, nomeados pelo ID da Feature (ex: 16073.html),
+para facilitar análise de logs futuros.
+"""
 import json
 import uuid
 from typing import Optional, Dict, Any
@@ -6,6 +10,13 @@ from datetime import datetime
 from pathlib import Path
 
 from app.models.sync_log import SyncLog, SyncItem
+
+
+def _default_serializer(obj: Any) -> Any:
+    """Serializa datetime e outros tipos para JSON."""
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 
 class SyncLogger:
@@ -231,33 +242,74 @@ class SyncLogger:
     
     def finish_sync(self) -> Dict[str, Any]:
         """
-        Finaliza o registro de sincronização e salva o log.
-        
+        Finaliza o registro de sincronização e salva o relatório em HTML.
+
+        O arquivo é nomeado pelo ID da Feature (ex: 16073.html) para facilitar
+        análise de logs. Não gera mais arquivos .json ou .txt.
+
         Returns:
-            Resumo da sincronização
+            Resumo da sincronização com chave report_file apontando para o HTML.
         """
         if not self.current_log:
             return {}
-        
-        # Gera resumo
+
+        # Gera resumo e atualiza o log
         summary = self.current_log.get_summary()
         self.current_log.summary = summary
-        
-        # Salva log em JSON
-        log_file = self.log_dir / f"sync_{self.current_log.sync_id}.json"
-        with open(log_file, 'w', encoding='utf-8') as f:
-            json.dump(self.current_log.model_dump(), f, indent=2, ensure_ascii=False, default=str)
-        
-        # Salva resumo em texto legível
-        summary_file = self.log_dir / f"sync_{self.current_log.sync_id}_summary.txt"
-        with open(summary_file, 'w', encoding='utf-8') as f:
-            f.write(self._format_summary_text())
-        
+
+        # Dados para o relatório (serialização JSON-compatível)
+        log_dict = self.current_log.model_dump(mode="json")
+        if not log_dict.get("timestamp") and self.current_log.timestamp:
+            log_dict["timestamp"] = self.current_log.timestamp.isoformat()
+
+        # Nome do arquivo: ID da Feature (ex: 16073.html) ou sync_{sync_id}.html se sem Feature
+        if self.current_log.feature_id is not None:
+            report_filename = f"{self.current_log.feature_id}.html"
+        else:
+            report_filename = f"sync_{self.current_log.sync_id}.html"
+
+        report_path = self.log_dir / report_filename
+        html_content = self._generate_html_report(log_dict)
+        report_path.write_text(html_content, encoding="utf-8")
+
         log_data = summary.copy()
-        log_data['log_file'] = str(log_file)
-        log_data['summary_file'] = str(summary_file)
-        
+        log_data["report_file"] = str(report_path)
+
         return log_data
+
+    def _generate_html_report(self, log_dict: Dict[str, Any]) -> str:
+        """
+        Gera o HTML do relatório a partir do template e dos dados do log.
+
+        Args:
+            log_dict: Dicionário com dados da sincronização (serializável em JSON).
+
+        Returns:
+            Conteúdo HTML completo.
+        """
+        template_dir = Path(__file__).resolve().parent.parent / "templates"
+        template_path = template_dir / "sync_report.html"
+        if not template_path.exists():
+            # Fallback: gera HTML mínimo com JSON embutido
+            json_str = json.dumps(log_dict, ensure_ascii=False, default=_default_serializer)
+            feature_id = log_dict.get("feature_id") or log_dict.get("summary", {}).get("feature_id") or "N/A"
+            return (
+                "<!DOCTYPE html><html><head><meta charset='utf-8'/><title>Sync Report — Feature "
+                + str(feature_id)
+                + "</title></head><body><pre id='log-data'>"
+                + json_str.replace("<", "&lt;").replace(">", "&gt;")
+                + "</pre><p>Template sync_report.html não encontrado em "
+                + str(template_dir)
+                + ".</p></body></html>"
+            )
+
+        template_content = template_path.read_text(encoding="utf-8")
+        json_str = json.dumps(log_dict, ensure_ascii=False, default=_default_serializer)
+        # Evita que </script> dentro do JSON quebre o HTML
+        json_str = json_str.replace("</script>", "<\\/script>")
+        feature_id = log_dict.get("feature_id") or log_dict.get("summary", {}).get("feature_id") or "N/A"
+        html = template_content.replace("{{LOG_JSON}}", json_str).replace("{{FEATURE_ID}}", str(feature_id))
+        return html
     
     def _format_summary_text(self) -> str:
         """Formata resumo em texto legível"""

@@ -48,8 +48,10 @@ ENV/
 # Uploads e arquivos temporários
 uploads/
 *.mpp
+# Logs de sincronização (apenas HTML, nomeados pelo ID da Feature)
 logs/*.json
 logs/*.txt
+logs/*.html
 !logs/.gitkeep
 
 # Testes e cobertura
