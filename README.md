@@ -36,7 +36,7 @@ Sistema automatizado para sincronizar arquivos `.mpp` (Microsoft Project) do Sha
 
 ### Tecnologias Utilizadas
 
-- **Backend**: Python 3.9+, FastAPI, Pydantic
+- **Backend**: Python 3.10+, FastAPI, Pydantic
 - **Parsing MPP**: MPXJ (Java) via CLI
 - **Integração**: Azure DevOps REST API, Microsoft Graph API (SharePoint)
 - **Pipeline**: Azure DevOps Pipelines (YAML)
@@ -85,7 +85,7 @@ Azure DevOps (Work Items)
 <a id="pre-requisitos"></a>
 ## 📋 Pré-requisitos
 
-- **Python 3.9+**
+- **Python 3.10+**
 - **Java JDK 11+** (necessário para parsing de arquivos .mpp via MPXJ)
 - **Conta Azure DevOps** com PAT (Personal Access Token) com permissões de Work Items (Read & Write)
 - **App Registration** no Microsoft Entra ID (para acesso ao SharePoint)
@@ -148,7 +148,7 @@ A pipeline está configurada para executar:
   - 6:30h BRT = 9:30h UTC
 - **Verificação de Alterações**: Processa apenas arquivos modificados desde a última sincronização
 - **Ambiente**: Ubuntu Latest
-- **Python**: 3.9
+- **Python**: 3.10 (pré-instalado no agente; evita download e token GitHub)
 - **Java**: JDK 11
 
 #### Variáveis Obrigatórias para SharePoint
@@ -198,25 +198,19 @@ Configure as seguintes variáveis em **Edit** → **Variables**:
 
 #### Variáveis Opcionais (com valores padrão)
 
-8. **`GITHUB_ACCESS_TOKEN`**
-   - **Valor**: Personal Access Token do GitHub (opcional)
-   - **Tipo**: String
-   - **Secreto**: ✅ **SIM** (recomendado)
-   - **Nota**: Configurar para evitar o aviso/limite de download anônimo ao baixar a versão do Python na task *UsePythonVersion*. Sem este token, a pipeline pode exibir: *"You should provide GitHub token if you want to download a python release."*
-
-9. **`AZURE_DEVOPS_ORG`**
+8. **`AZURE_DEVOPS_ORG`**
    - **Valor**: Nome da organização (padrão configurado no código)
    - **Tipo**: String
    - **Secreto**: ❌ Não
    - **Nota**: Configure apenas se diferente do padrão
 
-10. **`AZURE_DEVOPS_PROJECT`**
+9. **`AZURE_DEVOPS_PROJECT`**
    - **Valor**: Nome do projeto (padrão configurado no código)
    - **Tipo**: String
    - **Secreto**: ❌ Não
    - **Nota**: Configure apenas se diferente do padrão
 
-11. **`LOG_LEVEL`**
+10. **`LOG_LEVEL`**
     - **Valor**: `INFO` (padrão)
     - **Tipo**: String
     - **Secreto**: ❌ Não

@@ -36,8 +36,9 @@ variables:
   # Variáveis podem ser configuradas diretamente na pipeline ou via Pipeline Variables
   # Para usar grupo de variáveis, descomente a linha abaixo e crie o grupo MPP_SYNC_VARIABLES
   # - group: MPP_SYNC_VARIABLES  # Grupo de variáveis (opcional)
+  # Python 3.10: versão pré-instalada no Microsoft-hosted agent (ubuntu-latest), evita download e token GitHub
   - name: PYTHON_VERSION
-    value: '3.9'
+    value: '3.10'
   - name: JAVA_VERSION
     value: '11'
 
@@ -47,15 +48,12 @@ steps:
     displayName: 'Checkout do código'
     fetchDepth: 1
 
-  # Step 2: Setup Python
-  # Opcional: configure a variável GITHUB_ACCESS_TOKEN (PAT do GitHub) em Pipeline Variables
-  # para evitar o limite de download anônimo do GitHub ao baixar releases do Python.
+  # Step 2: Setup Python (usa versão pré-instalada no agente, sem download do GitHub)
   - task: UsePythonVersion@0
     displayName: 'Configurar Python $(PYTHON_VERSION)'
     inputs:
       versionSpec: '$(PYTHON_VERSION)'
       addToPath: true
-      githubToken: $(GITHUB_ACCESS_TOKEN)
 
   # Step 3: Setup Java JDK
   - task: JavaToolInstaller@0
