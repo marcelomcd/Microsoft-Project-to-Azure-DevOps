@@ -43,6 +43,7 @@ RESOURCE_EMAIL_MAP: Dict[str, str] = {
     "Vanessa Monteiro": "vanessa.monteiro@qualiit.com.br",
     "Victor Alves": "victor.alves@qualiit.com.br",
     "Vinicius Fava": "vinicius.fava@qualiit.com.br",
+    "Vladimir Davelli": "vladimir.davelli@qualiit.com.br",
     "Wilson Santos": "wilson.santos@qualiit.com.br",
     # Variações comuns
     "Cliente": None,  # Cliente não tem email específico
