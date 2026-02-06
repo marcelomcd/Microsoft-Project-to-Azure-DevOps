@@ -944,7 +944,6 @@ class MapperService:
                 result.created_tasks += 1
                 result.work_items.append(created)
                 item_map[task_id] = created.id
-                
                 self.sync_logger.log_created_task(
                     title=title,
                     work_item_id=created.id,
@@ -1054,10 +1053,8 @@ class MapperService:
             if assigned_to is not None:
                 update_params["assigned_to"] = assigned_to
             elif task.resource_name:
-                # Verifica se o recurso contém "Cliente" e assigned_to é None (deixar em branco)
                 resource_lower = task.resource_name.lower().strip()
                 if 'cliente' in resource_lower:
-                    # Recurso é "Cliente" e assigned_to é None -> remove responsável
                     update_params["assigned_to"] = ""
             
             # Atualiza datas se fornecidas
@@ -1083,14 +1080,11 @@ class MapperService:
                 result.updated_tasks += 1
                 result.work_items.append(updated)
                 item_map[task_id] = existing_id
-                
                 parent_id = updated.fields.get('System.Parent')
                 if isinstance(parent_id, dict):
                     parent_id = parent_id.get('id')
-                
                 if correct_parent_id:
                     print(f"MapperService: Task '{title}' (ID: {existing_id}) re-vinculada ao parent {correct_parent_id}")
-                
                 self.sync_logger.log_updated_task(
                     title=title,
                     work_item_id=existing_id,

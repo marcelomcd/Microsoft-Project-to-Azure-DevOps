@@ -19,6 +19,7 @@
       --info: #78a6ff;
       --us: #7eb8ff;
       --task: #c9a227;
+      --update: #43f5a3;
       --chip: rgba(255,255,255,0.10);
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
@@ -34,6 +35,7 @@
       --chip: rgba(10, 21, 49, 0.08);
       --us: #2d7ae0;
       --task: #a67c00;
+      --update: #107c10;
     }
     * { box-sizing: border-box; }
     body {
@@ -109,6 +111,7 @@
     .dot.info { background: var(--info); box-shadow: 0 0 0 4px rgba(120,166,255,.16); }
     .dot.us { background: var(--us); box-shadow: 0 0 0 4px rgba(126,184,255,.2); }
     .dot.task { background: var(--task); box-shadow: 0 0 0 4px rgba(201,162,39,.2); }
+    .dot.update { background: var(--update); box-shadow: 0 0 0 4px rgba(67,245,163,.16); }
     .stats { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
     .stat {
       border: 1px solid var(--border);
@@ -156,6 +159,7 @@
     .badge.info { color: var(--info); }
     .badge.us { color: var(--us); }
     .badge.task { color: var(--task); }
+    .badge.update { color: var(--update); }
     .tableWrap { padding: 10px 12px 14px; border-top: 1px solid var(--border); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     thead th {
@@ -178,6 +182,7 @@
     .pill.info { color: var(--info); }
     .pill.us { color: var(--us); }
     .pill.task { color: var(--task); }
+    .pill.update { color: var(--update); }
     .filters { display:flex; gap: 10px; align-items:center; flex-wrap: wrap; margin-top: 10px; }
     .search {
       flex: 1; min-width: 220px;
@@ -395,7 +400,7 @@
       tdMpp.textContent = it.mpp_task_id ?? '—';
 
       const tdAction = document.createElement('td');
-      const actionTone = it.action === 'failed' ? 'bad' : (it.action === 'skipped' ? 'warn' : (it.action === 'created' ? 'ok' : 'info'));
+      const actionTone = it.action === 'failed' ? 'bad' : (it.action === 'skipped' ? 'warn' : (it.action === 'created' ? 'ok' : (it.action === 'updated' ? (isTask ? 'task' : 'us') : 'info')));
       tdAction.appendChild(pill(it.action || '—', actionTone));
 
       const tdErr = document.createElement('td');
@@ -425,11 +430,22 @@
   const skippedT  = (data.skipped_tasks || []).length;
 
   const failedUS  = (data.failed_user_stories || []).length;
-  const failedT   = (data.failed_tasks || []).length;
+  const allFailedT = data.failed_tasks || [];
+  const isClienteRecurso = (s) => (s ?? '').toString().toLowerCase().includes('cliente');
+  const tasksClienteItems = allFailedT.filter(it => isClienteRecurso(it.assigned_to));
+  const failedTasksOnly = allFailedT.filter(it => !isClienteRecurso(it.assigned_to));
+  const failedT = failedTasksOnly.length;
+  const tasksCliente = tasksClienteItems.length;
+
+  // Dados para exibição: "Tasks — Cliente" = falhas com recurso Cliente; "Tasks — Falhas" = demais falhas
+  const displayData = Object.assign({}, data, {
+    tasks_cliente: tasksClienteItems,
+    failed_tasks: failedTasksOnly
+  });
 
   // "Já existiam na Feature antes" (inferido do log)
   const existingUS = updatedUS + skippedUS + failedUS;
-  const existingT  = updatedT  + skippedT  + failedT;
+  const existingT  = updatedT  + skippedT  + allFailedT.length;
 
   // Meta
   $('projectName').textContent = data.project_name || data.summary?.project_name || '—';
@@ -447,11 +463,12 @@
     { label: 'Referência no arquivo', value: 'US ' + refUS + ' • Tasks ' + refT, tone: 'info' },
     { label: 'Já existiam na Feature', value: 'US ' + existingUS + ' • Tasks ' + existingT, tone: 'warn' },
     { label: 'Criados', value: 'US ' + createdUS + ' • Tasks ' + createdT, tone: 'ok' },
-    { label: 'Atualizados', value: 'US ' + updatedUS + ' • Tasks ' + updatedT, tone: 'info' },
+    { label: 'Atualizados', value: 'US ' + updatedUS + ' • Tasks ' + updatedT, tone: 'update' },
+    { label: 'Tasks — Cliente', value: String(tasksCliente), tone: 'task' },
     { label: 'Erros', value: 'US ' + failedUS + ' • Tasks ' + failedT, tone: (failedUS + failedT) ? 'bad' : 'ok' },
   ];
-
-  chipItems.forEach(c => {
+  const chipItemsToShow = chipItems.filter(c => c.label !== 'Tasks — Cliente' || tasksCliente > 0);
+  chipItemsToShow.forEach(c => {
     const el = document.createElement('span');
     el.className = 'chip';
     const dot = document.createElement('span');
@@ -462,7 +479,7 @@
     chips.appendChild(el);
   });
 
-  // Summary cards
+  // Summary cards (Cliente não conta como erro)
   const health = (failedUS + failedT) > 0 ? 'ATENÇÃO' : 'OK';
   $('badgeHealth').textContent = health;
   $('badgeHealth').className = 'badge ' + ((failedUS + failedT) > 0 ? 'bad' : 'ok');
@@ -471,11 +488,12 @@
   statsGrid.appendChild(buildStat('No arquivo (ref.)', refUS + refT, 'User Stories: ' + refUS + ' • Tasks: ' + refT, 'info'));
   statsGrid.appendChild(buildStat('Na Feature (antes)', existingUS + existingT, 'User Stories: ' + existingUS + ' • Tasks: ' + existingT, 'warn'));
   statsGrid.appendChild(buildStat('Criados', createdUS + createdT, 'User Stories: ' + createdUS + ' • Tasks: ' + createdT, 'ok'));
-  statsGrid.appendChild(buildStat('Atualizados', updatedUS + updatedT, 'User Stories: ' + updatedUS + ' • Tasks: ' + updatedT, 'info'));
+  statsGrid.appendChild(buildStat('Atualizados', updatedUS + updatedT, 'User Stories: ' + updatedUS + ' • Tasks: ' + updatedT, 'ok'));
+  if (tasksCliente > 0) statsGrid.appendChild(buildStat('Tasks — Cliente', tasksCliente, 'Tasks com recurso Cliente (não contam como erro)', 'task'));
   statsGrid.appendChild(buildStat('Ignorados', skippedUS + skippedT, 'User Stories: ' + skippedUS + ' • Tasks: ' + skippedT, 'warn'));
   statsGrid.appendChild(buildStat('Erros', failedUS + failedT, 'User Stories: ' + failedUS + ' • Tasks: ' + failedT, (failedUS + failedT) ? 'bad' : 'ok'));
 
-  // Sections + search (User Stories = azul claro (us), Tasks = amarelo escuro (task), Erros = bad, OK = ok)
+  // Sections: User Story = azul claro (us), Task = amarelo (task), Falhas = bad
   const sections = [
     { key: 'created_user_stories', label: 'User Stories — Criadas', tone: 'us' },
     { key: 'updated_user_stories', label: 'User Stories — Atualizadas', tone: 'us' },
@@ -484,13 +502,14 @@
     { key: 'created_tasks', label: 'Tasks — Criadas', tone: 'task' },
     { key: 'updated_tasks', label: 'Tasks — Atualizadas', tone: 'task' },
     { key: 'skipped_tasks', label: 'Tasks — Ignoradas', tone: 'task' },
+    { key: 'tasks_cliente', label: 'Tasks — Cliente', tone: 'task' },
     { key: 'failed_tasks', label: 'Tasks — Falhas', tone: 'bad' },
   ];
 
   function allItems() {
     const items = [];
     sections.forEach(s => {
-      const arr = data[s.key] || [];
+      const arr = displayData[s.key] || [];
       arr.forEach(it => items.push(Object.assign({}, it, {__section: s.key})));
     });
     return items;
@@ -505,7 +524,7 @@
     let shownTotal = 0;
 
     sections.forEach(s => {
-      const arr = (data[s.key] || []);
+      const arr = (displayData[s.key] || []);
       const filtered = q
         ? arr.filter(it => {
             const hay = [
@@ -516,6 +535,7 @@
           })
         : arr;
 
+      if (filtered.length === 0 && !q) return;
       shownTotal += filtered.length;
 
       const d = document.createElement('details');
@@ -529,7 +549,7 @@
       right.style.gap = '10px';
       right.style.alignItems = 'center';
       right.appendChild(badge(filtered.length + ' item(s)', s.tone));
-      if (s.key.includes('failed') && filtered.length) right.appendChild(badge('verificar', 'bad'));
+      if ((s.key === 'failed_user_stories' || s.key === 'failed_tasks') && filtered.length) right.appendChild(badge('verificar', 'bad'));
       sum.appendChild(right);
 
       d.appendChild(sum);
