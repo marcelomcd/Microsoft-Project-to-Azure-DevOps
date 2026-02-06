@@ -13,6 +13,11 @@ class SyncItem(BaseModel):
     action: str = Field(..., description="Ação realizada: created, updated, skipped, failed")
     error: Optional[str] = Field(None, description="Mensagem de erro se action=failed")
     mpp_task_id: Optional[str] = Field(None, description="ID da tarefa no arquivo .mpp")
+    # Campos específicos de Task (exibidos no log como Recurso, Data Inicial, Data Final Estimada, Horas Original)
+    assigned_to: Optional[str] = Field(None, description="Recurso atrelado (nome no MPP ou responsável)")
+    start_date: Optional[datetime] = Field(None, description="Data inicial (Start Date)")
+    target_date: Optional[datetime] = Field(None, description="Data final estimada (Target Date)")
+    original_estimate_hours: Optional[float] = Field(None, description="Horas original estimada (Original Estimate)")
 
 
 class SyncLog(BaseModel):

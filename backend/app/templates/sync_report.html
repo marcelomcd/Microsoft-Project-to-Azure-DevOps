@@ -17,6 +17,8 @@
       --warn: #ffd166;
       --bad: #ff5c7a;
       --info: #78a6ff;
+      --us: #7eb8ff;
+      --task: #c9a227;
       --chip: rgba(255,255,255,0.10);
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
@@ -30,6 +32,8 @@
       --border: rgba(10, 21, 49, 0.12);
       --shadow: 0 20px 60px rgba(10, 21, 49, 0.12);
       --chip: rgba(10, 21, 49, 0.08);
+      --us: #2d7ae0;
+      --task: #a67c00;
     }
     * { box-sizing: border-box; }
     body {
@@ -103,6 +107,8 @@
     .dot.bad { background: var(--bad); box-shadow: 0 0 0 4px rgba(255,92,122,.16); }
     .dot.warn { background: var(--warn); box-shadow: 0 0 0 4px rgba(255,209,102,.16); }
     .dot.info { background: var(--info); box-shadow: 0 0 0 4px rgba(120,166,255,.16); }
+    .dot.us { background: var(--us); box-shadow: 0 0 0 4px rgba(126,184,255,.2); }
+    .dot.task { background: var(--task); box-shadow: 0 0 0 4px rgba(201,162,39,.2); }
     .stats { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
     .stat {
       border: 1px solid var(--border);
@@ -148,6 +154,8 @@
     .badge.bad { color: var(--bad); }
     .badge.warn { color: var(--warn); }
     .badge.info { color: var(--info); }
+    .badge.us { color: var(--us); }
+    .badge.task { color: var(--task); }
     .tableWrap { padding: 10px 12px 14px; border-top: 1px solid var(--border); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     thead th {
@@ -168,6 +176,8 @@
     .pill.bad { color: var(--bad); }
     .pill.warn { color: var(--warn); }
     .pill.info { color: var(--info); }
+    .pill.us { color: var(--us); }
+    .pill.task { color: var(--task); }
     .filters { display:flex; gap: 10px; align-items:center; flex-wrap: wrap; margin-top: 10px; }
     .search {
       flex: 1; min-width: 220px;
@@ -270,6 +280,30 @@
     return d.toLocaleString('pt-BR', { hour12: false });
   }
 
+  function fmtDatePtBr(ts) {
+    if (!ts) return '—';
+    const iso = ts.includes('T') ? ts : ts.replace(' ', 'T');
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return ts;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hour = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return day + '/' + month + '/' + year + ' ' + hour + ':' + min;
+  }
+
+  function fmtHoursPtBr(hours) {
+    if (hours == null || hours === undefined || hours === '') return '—';
+    const h = Number(hours);
+    if (isNaN(h) || h < 0) return '—';
+    const fullHours = Math.floor(h);
+    const minutes = Math.round((h - fullHours) * 60);
+    if (minutes === 0) return fullHours + 'h';
+    const minStr = String(minutes).padStart(2, '0');
+    return fullHours + ':' + minStr + 'h';
+  }
+
   function badge(text, tone) {
     const span = document.createElement('span');
     span.className = 'badge' + (tone ? ' ' + tone : '');
@@ -314,7 +348,7 @@
 
     const thead = document.createElement('thead');
     const trh = document.createElement('tr');
-    ['Tipo', 'Título', 'WI', 'Parent', 'MPP', 'Ação', 'Erro (se houver)'].forEach(h => {
+    ['Tipo', 'Título', 'Recurso', 'Data Inicial', 'Data Final Estimada', 'Horas Original', 'WI', 'Parent', 'MPP', 'Ação', 'Erro (se houver)'].forEach(h => {
       const th = document.createElement('th');
       th.textContent = h;
       trh.appendChild(th);
@@ -325,12 +359,28 @@
 
     items.forEach(it => {
       const tr = document.createElement('tr');
-
+      const isTask = (it.work_item_type || '').toLowerCase() === 'task';
+      const typeTone = it.action === 'failed' ? 'bad' : (isTask ? 'task' : 'us');
       const tdType = document.createElement('td');
-      tdType.appendChild(pill(it.work_item_type || '—', it.action === 'failed' ? 'bad' : 'info'));
+      tdType.appendChild(pill(it.work_item_type || '—', typeTone));
 
       const tdTitle = document.createElement('td');
       tdTitle.textContent = it.title || '—';
+
+      const tdRecurso = document.createElement('td');
+      tdRecurso.textContent = (it.assigned_to != null && it.assigned_to !== '') ? it.assigned_to : '—';
+
+      const tdStart = document.createElement('td');
+      tdStart.className = 'mono';
+      tdStart.textContent = fmtDatePtBr(it.start_date);
+
+      const tdTarget = document.createElement('td');
+      tdTarget.className = 'mono';
+      tdTarget.textContent = fmtDatePtBr(it.target_date);
+
+      const tdHours = document.createElement('td');
+      tdHours.className = 'mono';
+      tdHours.textContent = fmtHoursPtBr(it.original_estimate_hours);
 
       const tdId = document.createElement('td');
       tdId.className = 'mono';
@@ -352,7 +402,7 @@
       tdErr.style.color = it.error ? 'var(--bad)' : 'var(--muted)';
       tdErr.textContent = it.error ? it.error : '—';
 
-      tr.append(tdType, tdTitle, tdId, tdParent, tdMpp, tdAction, tdErr);
+      tr.append(tdType, tdTitle, tdRecurso, tdStart, tdTarget, tdHours, tdId, tdParent, tdMpp, tdAction, tdErr);
       tbody.appendChild(tr);
     });
 
@@ -425,15 +475,15 @@
   statsGrid.appendChild(buildStat('Ignorados', skippedUS + skippedT, 'User Stories: ' + skippedUS + ' • Tasks: ' + skippedT, 'warn'));
   statsGrid.appendChild(buildStat('Erros', failedUS + failedT, 'User Stories: ' + failedUS + ' • Tasks: ' + failedT, (failedUS + failedT) ? 'bad' : 'ok'));
 
-  // Sections + search
+  // Sections + search (User Stories = azul claro (us), Tasks = amarelo escuro (task), Erros = bad, OK = ok)
   const sections = [
-    { key: 'created_user_stories', label: 'User Stories — Criadas', tone: 'ok' },
-    { key: 'updated_user_stories', label: 'User Stories — Atualizadas', tone: 'info' },
-    { key: 'skipped_user_stories', label: 'User Stories — Ignoradas', tone: 'warn' },
+    { key: 'created_user_stories', label: 'User Stories — Criadas', tone: 'us' },
+    { key: 'updated_user_stories', label: 'User Stories — Atualizadas', tone: 'us' },
+    { key: 'skipped_user_stories', label: 'User Stories — Ignoradas', tone: 'us' },
     { key: 'failed_user_stories', label: 'User Stories — Falhas', tone: 'bad' },
-    { key: 'created_tasks', label: 'Tasks — Criadas', tone: 'ok' },
-    { key: 'updated_tasks', label: 'Tasks — Atualizadas', tone: 'info' },
-    { key: 'skipped_tasks', label: 'Tasks — Ignoradas', tone: 'warn' },
+    { key: 'created_tasks', label: 'Tasks — Criadas', tone: 'task' },
+    { key: 'updated_tasks', label: 'Tasks — Atualizadas', tone: 'task' },
+    { key: 'skipped_tasks', label: 'Tasks — Ignoradas', tone: 'task' },
     { key: 'failed_tasks', label: 'Tasks — Falhas', tone: 'bad' },
   ];
 
@@ -460,7 +510,7 @@
         ? arr.filter(it => {
             const hay = [
               it.title, it.work_item_type, it.work_item_id, it.parent_id,
-              it.action, it.mpp_task_id, it.error
+              it.action, it.mpp_task_id, it.error, it.assigned_to
             ].map(x => (x ?? '').toString()).join(' • ').toLowerCase();
             return hay.includes(q);
           })

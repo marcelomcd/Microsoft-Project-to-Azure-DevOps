@@ -98,7 +98,11 @@ class SyncLogger:
         title: str,
         work_item_id: int,
         parent_id: Optional[int],
-        mpp_task_id: Optional[str] = None
+        mpp_task_id: Optional[str] = None,
+        assigned_to: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        target_date: Optional[datetime] = None,
+        original_estimate_hours: Optional[float] = None
     ):
         """Registra uma Task criada"""
         if not self.current_log:
@@ -110,7 +114,11 @@ class SyncLogger:
             work_item_id=work_item_id,
             parent_id=parent_id,
             action="created",
-            mpp_task_id=mpp_task_id
+            mpp_task_id=mpp_task_id,
+            assigned_to=assigned_to,
+            start_date=start_date,
+            target_date=target_date,
+            original_estimate_hours=original_estimate_hours
         )
         self.current_log.created_tasks.append(item)
     
@@ -140,7 +148,11 @@ class SyncLogger:
         title: str,
         work_item_id: int,
         parent_id: Optional[int],
-        mpp_task_id: Optional[str] = None
+        mpp_task_id: Optional[str] = None,
+        assigned_to: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        target_date: Optional[datetime] = None,
+        original_estimate_hours: Optional[float] = None
     ):
         """Registra uma Task atualizada"""
         if not self.current_log:
@@ -152,7 +164,11 @@ class SyncLogger:
             work_item_id=work_item_id,
             parent_id=parent_id,
             action="updated",
-            mpp_task_id=mpp_task_id
+            mpp_task_id=mpp_task_id,
+            assigned_to=assigned_to,
+            start_date=start_date,
+            target_date=target_date,
+            original_estimate_hours=original_estimate_hours
         )
         self.current_log.updated_tasks.append(item)
     
@@ -182,7 +198,11 @@ class SyncLogger:
         title: str,
         work_item_id: Optional[int],
         parent_id: Optional[int],
-        mpp_task_id: Optional[str] = None
+        mpp_task_id: Optional[str] = None,
+        assigned_to: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        target_date: Optional[datetime] = None,
+        original_estimate_hours: Optional[float] = None
     ):
         """Registra uma Task pulada (duplicada)"""
         if not self.current_log:
@@ -194,7 +214,11 @@ class SyncLogger:
             work_item_id=work_item_id,
             parent_id=parent_id,
             action="skipped",
-            mpp_task_id=mpp_task_id
+            mpp_task_id=mpp_task_id,
+            assigned_to=assigned_to,
+            start_date=start_date,
+            target_date=target_date,
+            original_estimate_hours=original_estimate_hours
         )
         self.current_log.skipped_tasks.append(item)
     
@@ -224,7 +248,11 @@ class SyncLogger:
         title: str,
         error: str,
         parent_id: Optional[int],
-        mpp_task_id: Optional[str] = None
+        mpp_task_id: Optional[str] = None,
+        assigned_to: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        target_date: Optional[datetime] = None,
+        original_estimate_hours: Optional[float] = None
     ):
         """Registra uma Task que falhou"""
         if not self.current_log:
@@ -236,7 +264,11 @@ class SyncLogger:
             parent_id=parent_id,
             action="failed",
             error=error,
-            mpp_task_id=mpp_task_id
+            mpp_task_id=mpp_task_id,
+            assigned_to=assigned_to,
+            start_date=start_date,
+            target_date=target_date,
+            original_estimate_hours=original_estimate_hours
         )
         self.current_log.failed_tasks.append(item)
     

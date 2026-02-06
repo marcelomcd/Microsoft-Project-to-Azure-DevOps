@@ -347,7 +347,11 @@ class MapperService:
                     title=task.name,
                     error=error_msg,
                     parent_id=parent_feature_id,
-                    mpp_task_id=task_id
+                    mpp_task_id=task_id,
+                    assigned_to=task.resource_name,
+                    start_date=task.start_date,
+                    target_date=task.finish_date,
+                    original_estimate_hours=task.work_hours
                 )
                 continue
             
@@ -422,7 +426,8 @@ class MapperService:
                         task_id=task_id,
                         existing_id=existing_id,
                         result=result,
-                        item_map=item_map
+                        item_map=item_map,
+                        task=task
                     )
             else:
                 self._create_task(
@@ -944,7 +949,11 @@ class MapperService:
                     title=title,
                     work_item_id=created.id,
                     parent_id=parent_id,
-                    mpp_task_id=task_id
+                    mpp_task_id=task_id,
+                    assigned_to=task.resource_name,
+                    start_date=task.start_date,
+                    target_date=task.finish_date,
+                    original_estimate_hours=task.work_hours
                 )
         except Exception as e:
             error_msg = f"Erro ao criar Task '{title}': {str(e)}"
@@ -953,7 +962,11 @@ class MapperService:
                 title=title,
                 error=error_msg,
                 parent_id=parent_id,
-                mpp_task_id=task_id
+                mpp_task_id=task_id,
+                assigned_to=task.resource_name,
+                start_date=task.start_date,
+                target_date=task.finish_date,
+                original_estimate_hours=task.work_hours
             )
     
     def _update_task(
@@ -1082,7 +1095,11 @@ class MapperService:
                     title=title,
                     work_item_id=existing_id,
                     parent_id=parent_id,
-                    mpp_task_id=task_id
+                    mpp_task_id=task_id,
+                    assigned_to=task.resource_name,
+                    start_date=task.start_date,
+                    target_date=task.finish_date,
+                    original_estimate_hours=task.work_hours
                 )
         except Exception as e:
             error_msg = f"Erro ao atualizar Task '{title}': {str(e)}"
@@ -1091,7 +1108,11 @@ class MapperService:
                 title=title,
                 error=error_msg,
                 parent_id=None,
-                mpp_task_id=task_id
+                mpp_task_id=task_id,
+                assigned_to=task.resource_name,
+                start_date=task.start_date,
+                target_date=task.finish_date,
+                original_estimate_hours=task.work_hours
             )
     
     def _skip_task(
@@ -1100,7 +1121,8 @@ class MapperService:
         task_id: str,
         existing_id: int,
         result: ConversionResult,
-        item_map: Dict[str, Optional[int]]
+        item_map: Dict[str, Optional[int]],
+        task: Optional[MPPTask] = None
     ):
         """
         Pula uma Task duplicada (não atualiza).
@@ -1111,6 +1133,7 @@ class MapperService:
             existing_id: ID da Task existente
             result: Resultado da conversão (será atualizado)
             item_map: Mapa de task_id -> work_item_id
+            task: Dados da Task do MPP (opcional, para preencher recurso/datas/estimativa no log)
         """
         result.skipped_tasks += 1
         item_map[task_id] = existing_id
@@ -1130,7 +1153,11 @@ class MapperService:
             title=title,
             work_item_id=existing_id,
             parent_id=parent_id,
-            mpp_task_id=task_id
+            mpp_task_id=task_id,
+            assigned_to=task.resource_name if task else None,
+            start_date=task.start_date if task else None,
+            target_date=task.finish_date if task else None,
+            original_estimate_hours=task.work_hours if task else None
         )
     
     # Métodos auxiliares gerais
