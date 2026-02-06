@@ -194,4 +194,5 @@ Simplesmente **não atribua nenhum recurso** à tarefa no Microsoft Project. Tar
 
 ---
 
-**Última atualização**: Dezembro 2024
+**Última atualização**: 19 de Janeiro de 2026
+**Elaborado Por**: Marcelo Macedo

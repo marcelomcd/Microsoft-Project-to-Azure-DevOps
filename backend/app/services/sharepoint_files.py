@@ -465,4 +465,225 @@ class SharePointFileService:
         except requests.exceptions.RequestException as e:
             logger.error(f"Erro ao baixar arquivo {file_id}: {e}")
             raise ValueError(f"Falha ao baixar arquivo do SharePoint: {e}")
+    
+    def upload_file(
+        self,
+        file_path: Path,
+        folder_path: Optional[str] = None,
+        overwrite: bool = True
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Faz upload de um arquivo para o SharePoint.
+        
+        Args:
+            file_path: Caminho do arquivo local para upload
+            folder_path: Caminho da pasta no SharePoint (usa self.folder_path se não fornecido)
+            overwrite: Se True, sobrescreve arquivo existente
+            
+        Returns:
+            Dicionário com informações do arquivo enviado ou None se erro
+        """
+        logger.info(f"Fazendo upload de arquivo para SharePoint: {file_path.name}")
+        
+        file_path = Path(file_path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"Arquivo não encontrado: {file_path}")
+        
+        # Obtém IDs necessários
+        site_id = self._get_site_id()
+        drive_id = self._get_drive_id(site_id)
+        target_folder_path = folder_path or self.folder_path
+        
+        # Tenta encontrar a pasta (pode tentar variações do caminho)
+        folder_id = self._get_folder_id(drive_id, target_folder_path)
+        
+        # Se não encontrou, tenta variações (mesma lógica usada em list_mpp_files)
+        if not folder_id:
+            logger.warning(f"Pasta não encontrada: {target_folder_path}. Tentando variações do caminho.")
+            # Remove prefixo "Documentos Compartilhados/" se presente
+            if target_folder_path.startswith("Documentos Compartilhados/"):
+                alternative_path = target_folder_path.replace("Documentos Compartilhados/", "")
+                logger.info(f"Tentando caminho alternativo: {alternative_path}")
+                folder_id = self._get_folder_id(drive_id, alternative_path)
+        
+        if not folder_id:
+            raise ValueError(f"Pasta não encontrada no SharePoint: {target_folder_path}")
+        
+        access_token = self.auth_service.get_access_token()
+        
+        # Lê conteúdo do arquivo
+        with open(file_path, 'rb') as f:
+            file_content = f.read()
+        
+        # URL para upload (usa método de upload simples para arquivos < 4MB)
+        # Para arquivos maiores, seria necessário usar upload session
+        file_name = file_path.name
+        
+        # Codifica nome do arquivo para URL (importante para caracteres especiais)
+        from urllib.parse import quote
+        encoded_file_name = quote(file_name, safe='')
+        
+        url = f"{self.graph_base_url}/drives/{drive_id}/items/{folder_id}:/{encoded_file_name}:/content"
+        
+        if overwrite:
+            # Adiciona parâmetro para sobrescrever
+            url += "?@microsoft.graph.conflictBehavior=replace"
+        
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/octet-stream"
+        }
+        
+        try:
+            file_size_kb = len(file_content) / 1024
+            logger.info(f"Fazendo upload de arquivo ({file_size_kb:.2f} KB)...")
+            logger.debug(f"URL: {url}")
+            
+            # Para arquivos maiores que 4MB, usa upload session
+            # Para arquivos menores, usa upload simples
+            if len(file_content) > 4 * 1024 * 1024:  # 4MB
+                logger.info("Arquivo maior que 4MB, usando upload session...")
+                return self._upload_large_file(drive_id, folder_id, file_path, file_content, access_token)
+            
+            # Upload simples para arquivos < 4MB
+            response = requests.put(
+                url, 
+                headers=headers, 
+                data=file_content, 
+                timeout=300,  # Aumenta timeout para 5 minutos
+                stream=False
+            )
+            
+            # Log resposta
+            logger.debug(f"Status code: {response.status_code}")
+            
+            if response.status_code == 403:
+                error_msg = "Erro 403: Permissão negada. Verifique se Sites.ReadWrite.All está concedido para o App Registration."
+                logger.error(error_msg)
+                if response.text:
+                    logger.error(f"Resposta do servidor: {response.text[:500]}")
+                raise ValueError(error_msg)
+            
+            response.raise_for_status()
+            
+            file_data = response.json()
+            logger.info(f"Arquivo enviado com sucesso: {file_data.get('name', file_name)}")
+            logger.info(f"   ID: {file_data.get('id')}")
+            logger.info(f"   Tamanho: {file_data.get('size', 0) / 1024:.2f} KB")
+            
+            return {
+                "id": file_data.get("id"),
+                "name": file_data.get("name"),
+                "size": file_data.get("size"),
+                "web_url": file_data.get("webUrl"),
+                "last_modified": file_data.get("lastModifiedDateTime")
+            }
+            
+        except requests.exceptions.Timeout:
+            error_msg = "Timeout ao fazer upload. Arquivo pode ser muito grande ou conexão lenta."
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Erro ao fazer upload do arquivo: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                logger.error(f"Status code: {e.response.status_code}")
+                logger.error(f"Resposta: {e.response.text[:500]}")
+                if e.response.status_code == 403:
+                    raise ValueError(
+                        "Erro 403: Permissão negada. Verifique se Sites.ReadWrite.All está concedido "
+                        "e se o consentimento do administrador foi dado no Azure Portal."
+                    )
+            raise ValueError(f"Falha ao fazer upload do arquivo para SharePoint: {e}")
+    
+    def _upload_large_file(
+        self,
+        drive_id: str,
+        folder_id: str,
+        file_path: Path,
+        file_content: bytes,
+        access_token: str
+    ) -> Dict[str, Any]:
+        """
+        Faz upload de arquivo grande (>4MB) usando upload session.
+        
+        Args:
+            drive_id: Drive ID
+            folder_id: Folder ID
+            file_path: Caminho do arquivo
+            file_content: Conteúdo do arquivo em bytes
+            access_token: Access token
+            
+        Returns:
+            Dicionário com informações do arquivo enviado
+        """
+        file_name = file_path.name
+        file_size = len(file_content)
+        
+        # Cria upload session
+        session_url = f"{self.graph_base_url}/drives/{drive_id}/items/{folder_id}:/{file_name}:/createUploadSession"
+        
+        session_headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+        
+        session_body = {
+            "item": {
+                "@microsoft.graph.conflictBehavior": "replace",
+                "name": file_name
+            }
+        }
+        
+        logger.info(f"Criando upload session para arquivo de {file_size / 1024 / 1024:.2f} MB...")
+        session_response = requests.post(session_url, headers=session_headers, json=session_body, timeout=30)
+        session_response.raise_for_status()
+        session_data = session_response.json()
+        upload_url = session_data.get("uploadUrl")
+        
+        if not upload_url:
+            raise ValueError("Upload session não retornou uploadUrl")
+        
+        # Faz upload em chunks (4MB cada)
+        chunk_size = 4 * 1024 * 1024  # 4MB
+        total_chunks = (file_size + chunk_size - 1) // chunk_size
+        
+        logger.info(f"Fazendo upload em {total_chunks} chunk(s)...")
+        
+        for chunk_num in range(total_chunks):
+            start = chunk_num * chunk_size
+            end = min(start + chunk_size, file_size)
+            chunk = file_content[start:end]
+            
+            chunk_headers = {
+                "Content-Length": str(len(chunk)),
+                "Content-Range": f"bytes {start}-{end-1}/{file_size}"
+            }
+            
+            logger.debug(f"Enviando chunk {chunk_num + 1}/{total_chunks} ({len(chunk) / 1024:.2f} KB)...")
+            
+            chunk_response = requests.put(
+                upload_url,
+                headers=chunk_headers,
+                data=chunk,
+                timeout=300
+            )
+            
+            if chunk_response.status_code in [200, 201]:
+                # Upload completo
+                file_data = chunk_response.json()
+                logger.info(f"Upload completo: {file_data.get('name', file_name)}")
+                return {
+                    "id": file_data.get("id"),
+                    "name": file_data.get("name"),
+                    "size": file_data.get("size"),
+                    "web_url": file_data.get("webUrl"),
+                    "last_modified": file_data.get("lastModifiedDateTime")
+                }
+            elif chunk_response.status_code == 202:
+                # Chunk aceito, continua
+                continue
+            else:
+                chunk_response.raise_for_status()
+        
+        raise ValueError("Upload não foi completado")
 

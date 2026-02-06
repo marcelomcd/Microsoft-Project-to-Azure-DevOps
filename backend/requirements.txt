@@ -15,3 +15,6 @@ mpxj>=15.0.0
 # Microsoft Authentication Library (OAuth2)
 msal>=1.24.0
 
+# Windows COM API (para conversão XML para .mpp)
+pywin32>=306; sys_platform == "win32"
+
