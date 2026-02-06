@@ -31,6 +31,7 @@ Sistema automatizado para sincronizar arquivos `.mpp` (Microsoft Project) do Sha
 - ✅ **Detecção de Duplicatas**: Evita criar itens duplicados no Azure DevOps
 - ✅ **Horas de Trabalho**: Converte automaticamente horas do campo "Trabalho" do MPP para "Original Estimate" nas Tasks
 - ✅ **Histórico de Sincronização**: Mantém registro completo de todas as operações
+- ✅ **Relatórios em HTML**: Logs de sincronização apenas em HTML, nomeados pelo ID da Feature (ex: `16073.html`), para análise futura
 - ✅ **Cache Otimizado**: Sistema de cache para melhor performance
 
 ### Tecnologias Utilizadas
@@ -77,6 +78,7 @@ Azure DevOps (Work Items)
 5. **`AzureDevOpsClient`**: Cliente REST para Azure DevOps API
 6. **`SharePointFileService`**: Gerencia download de arquivos do SharePoint
 7. **`SyncHistoryService`**: Mantém histórico de sincronizações
+8. **`SyncLogger`**: Gera relatórios HTML de sincronização (nomeados pelo ID da Feature)
 
 ---
 
@@ -196,19 +198,25 @@ Configure as seguintes variáveis em **Edit** → **Variables**:
 
 #### Variáveis Opcionais (com valores padrão)
 
-8. **`AZURE_DEVOPS_ORG`**
+8. **`GITHUB_ACCESS_TOKEN`**
+   - **Valor**: Personal Access Token do GitHub (opcional)
+   - **Tipo**: String
+   - **Secreto**: ✅ **SIM** (recomendado)
+   - **Nota**: Configurar para evitar o aviso/limite de download anônimo ao baixar a versão do Python na task *UsePythonVersion*. Sem este token, a pipeline pode exibir: *"You should provide GitHub token if you want to download a python release."*
+
+9. **`AZURE_DEVOPS_ORG`**
    - **Valor**: Nome da organização (padrão configurado no código)
    - **Tipo**: String
    - **Secreto**: ❌ Não
    - **Nota**: Configure apenas se diferente do padrão
 
-9. **`AZURE_DEVOPS_PROJECT`**
+10. **`AZURE_DEVOPS_PROJECT`**
    - **Valor**: Nome do projeto (padrão configurado no código)
    - **Tipo**: String
    - **Secreto**: ❌ Não
    - **Nota**: Configure apenas se diferente do padrão
 
-10. **`LOG_LEVEL`**
+11. **`LOG_LEVEL`**
     - **Valor**: `INFO` (padrão)
     - **Tipo**: String
     - **Secreto**: ❌ Não
@@ -316,9 +324,10 @@ Após configurar, execute a pipeline manualmente e verifique os logs:
    - Tasks são vinculadas às User Stories corretas
    - Mantém estrutura: Feature → User Story → Task
 
-10. **Registro de Histórico**:
+10. **Registro de Histórico e Relatório**:
     - Salva timestamp da sincronização
-    - Gera relatório JSON com estatísticas
+    - Gera relatório em **HTML** (não mais .json ou .txt), nomeado pelo **ID da Feature** (ex: `16073.html`), em `backend/logs/`
+    - O relatório inclui: referência no arquivo (User Stories/Tasks), já existiam na Feature, criados, atualizados, ignorados, erros (com motivo quando houver)
 
 ### Formato do Nome do Arquivo
 
@@ -371,6 +380,8 @@ O nome do arquivo `.mpp` deve seguir o padrão:
 │   │   │   ├── mpp_models.py    # Modelos de dados MPP
 │   │   │   ├── devops_models.py # Modelos de dados Azure DevOps
 │   │   │   └── sync_log.py      # Modelo de log de sincronização
+│   │   ├── templates/           # Templates para relatórios
+│   │   │   └── sync_report.html # Template HTML do relatório de sincronização
 │   │   ├── services/            # Serviços principais
 │   │   │   ├── devops_client.py     # Cliente Azure DevOps API
 │   │   │   ├── file_processor.py    # Processador de arquivos
@@ -400,7 +411,7 @@ O nome do arquivo `.mpp` deve seguir o padrão:
 │   │   ├── jackson-*.jar         # Jackson JSON (dependências)
 │   │   ├── commons-*.jar        # Apache Commons (dependências)
 │   │   └── log4j-*.jar          # Log4j (dependências)
-│   ├── logs/                     # Logs do sistema e histórico de sincronização
+│   ├── logs/                     # Relatórios HTML de sincronização (ex: 16073.html) e sync_history.json
 │   ├── pipeline_sync.py          # Script principal para execução agendada
 │   ├── test_sharepoint_path.py   # Script para descobrir caminho SharePoint
 │   ├── requirements.txt          # Dependências Python
@@ -440,7 +451,7 @@ O sistema suporta execução agendada via pipeline do Azure DevOps para processa
 - ✅ **Processamento Automático**: Executa de segunda a sexta-feira às 6:30h BRT (9:30h UTC)
 - ✅ **Processamento Inteligente**: Processa apenas arquivos novos ou modificados
 - ✅ **Histórico Persistente**: Mantém histórico de sincronização para evitar reprocessamento
-- ✅ **Logs Detalhados**: Gera logs completos de todas as operações
+- ✅ **Logs Detalhados**: Gera relatórios HTML por Feature (ex: `16073.html`) com estatísticas e detalhes de erros
 - ✅ **Tratamento de Erros**: Continua processamento mesmo se alguns arquivos falharem
 
 ---
@@ -518,8 +529,11 @@ python test_sharepoint_path.py
 # Executar pipeline localmente (simulação)
 python pipeline_sync.py
 
-# Verificar logs
+# Verificar histórico de sincronização
 cat backend/logs/sync_history.json
+
+# Relatórios de sincronização (um HTML por Feature, ex: 16073.html)
+ls backend/logs/*.html
 ```
 
 ### Formato de Nome de Arquivo
@@ -561,14 +575,14 @@ Este projeto é de uso interno.
 ## 🆘 Suporte
 
 Para problemas ou dúvidas:
-1. Verifique os logs em `backend/logs/sync_history.json`
+1. Verifique o histórico em `backend/logs/sync_history.json` e os relatórios HTML em `backend/logs/` (ex: `16073.html` por Feature)
 2. Execute `test_sharepoint_path.py` para testar conexão SharePoint
 3. Verifique as variáveis da pipeline no Azure DevOps
 4. Consulte a seção [Troubleshooting](#troubleshooting)
 
 ---
 
-**Última atualização**: 05/12/2025  
-**Versão**: 1.0.4
+**Última atualização**: 06/02/2026  
+**Versão**: 1.0.5
 **Desenvolvido por**: Marcelo Macedo  
 **E-mail**: [marcelo.macedo@qualiit.com.br](mailto:marcelo.macedo@qualiit.com.br)
