@@ -278,7 +278,12 @@ class SharePointFileService:
     
     def list_mpp_files(self) -> List[Dict[str, Any]]:
         """
-        Lista todos os arquivos .mpp no SharePoint.
+        Lista todos os arquivos .mpp na pasta principal e nas subpastas (ex.: pastas de clientes).
+        
+        A pasta configurada em folder_path é a pasta principal; dentro dela, todas as subpastas
+        são percorridas (um nível) e os .mpp de cada uma são incluídos. A regra de última
+        alteração (24h ou desde a última execução da pipeline) continua sendo aplicada pelo
+        pipeline ao processar esta lista.
         
         Returns:
             Lista de dicionários com informações dos arquivos:
@@ -287,6 +292,7 @@ class SharePointFileService:
             - size: Tamanho em bytes
             - last_modified: Data/hora da última modificação
             - web_url: URL do arquivo
+            - folder_name: Nome da subpasta (vazio "" se estiver na pasta principal)
         """
         logger.info("Listando arquivos .mpp do SharePoint")
         
@@ -361,52 +367,69 @@ class SharePointFileService:
                     logger.error(f"❌ Nenhuma variação do caminho funcionou. Verifique o caminho: {self.folder_path}")
                     return []  # Retorna vazio se nenhuma pasta for encontrada
             
-            # Lista arquivos na pasta
+            # Lista arquivos na pasta principal e em todas as subpastas (pastas de clientes)
             access_token = self.auth_service.get_access_token()
-            
-            # Lista todos os arquivos (filtrar .mpp depois)
-            url = f"{self.graph_base_url}/drives/{drive_id}/items/{folder_id}/children"
-            params = {
-                "$select": "id,name,size,lastModifiedDateTime,webUrl,file"
-            }
-            
             headers = {
                 "Authorization": f"Bearer {access_token}",
                 "Accept": "application/json"
             }
-            
+            params = {
+                "$select": "id,name,size,lastModifiedDateTime,webUrl,file,folder"
+            }
             mpp_files = []
-            
-            # Processa resultados paginados
+
+            def collect_mpp_from_folder(parent_folder_id: str, folder_name: str) -> None:
+                """Coleta arquivos .mpp de uma pasta (paginação incluída). folder_name vazio = pasta principal."""
+                nonlocal mpp_files
+                url = f"{self.graph_base_url}/drives/{drive_id}/items/{parent_folder_id}/children"
+                req_params = params
+                while url:
+                    response = requests.get(url, headers=headers, params=req_params, timeout=30)
+                    response.raise_for_status()
+                    data = response.json()
+                    items = data.get("value", [])
+                    for item in items:
+                        name = item.get("name", "")
+                        if item.get("folder") is not None:
+                            # É uma subpasta: não percorre recursivamente além do primeiro nível
+                            continue
+                        if name.lower().endswith(".mpp") and item.get("file") is not None:
+                            file_info = {
+                                "name": name,
+                                "id": item.get("id"),
+                                "size": item.get("size", 0),
+                                "last_modified": item.get("lastModifiedDateTime"),
+                                "web_url": item.get("webUrl"),
+                                "folder_name": folder_name,
+                            }
+                            mpp_files.append(file_info)
+                    next_link = data.get("@odata.nextLink")
+                    url = next_link if next_link else None
+                    req_params = None  # próxima página já traz parâmetros na URL
+
+            # 1) Arquivos .mpp na pasta principal (folder_name = "")
+            collect_mpp_from_folder(folder_id, "")
+
+            # 2) Lista subpastas da pasta principal e coleta .mpp de cada uma
+            url = f"{self.graph_base_url}/drives/{drive_id}/items/{folder_id}/children"
             while url:
                 response = requests.get(url, headers=headers, params=params, timeout=30)
                 response.raise_for_status()
-                
                 data = response.json()
                 items = data.get("value", [])
-                
                 for item in items:
-                    # Filtra apenas arquivos .mpp (não pastas)
-                    name = item.get("name", "")
-                    if name.lower().endswith(".mpp") and item.get("file") is not None:
-                        file_info = {
-                            "name": name,
-                            "id": item.get("id"),
-                            "size": item.get("size", 0),
-                            "last_modified": item.get("lastModifiedDateTime"),
-                            "web_url": item.get("webUrl")
-                        }
-                        mpp_files.append(file_info)
-                
-                # Verifica se há próxima página
+                    if item.get("folder") is None:
+                        continue
+                    subfolder_id = item.get("id")
+                    subfolder_name = item.get("name", "")
+                    if not subfolder_id:
+                        continue
+                    logger.debug(f"Listando arquivos na subpasta: {subfolder_name}")
+                    collect_mpp_from_folder(subfolder_id, subfolder_name)
                 next_link = data.get("@odata.nextLink")
-                if next_link:
-                    url = next_link
-                    params = None  # URL já tem parâmetros
-                else:
-                    break
-            
-            logger.info(f"Encontrados {len(mpp_files)} arquivo(s) .mpp")
+                url = next_link if next_link else None
+
+            logger.info(f"Encontrados {len(mpp_files)} arquivo(s) .mpp (pasta principal + subpastas)")
             return mpp_files
             
         except Exception as e:

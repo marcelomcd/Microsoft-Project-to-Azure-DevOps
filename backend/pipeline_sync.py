@@ -145,9 +145,12 @@ def process_files_sharepoint(
         filename = file_info["name"]
         file_id = file_info["id"]
         last_modified_str = file_info.get("last_modified")
-        
+        # Chave de histórico: inclui pasta quando arquivo está em subpasta (evita colisão de nomes iguais)
+        folder_name = file_info.get("folder_name") or ""
+        history_key = f"{folder_name}/{filename}" if folder_name else filename
+
         # Verifica se deve processar baseado no histórico
-        file_entry = history_service.get_file_info(filename)
+        file_entry = history_service.get_file_info(history_key)
         should_process = True
         file_was_modified = True  # Assume modificado se não houver histórico
         
@@ -198,9 +201,9 @@ def process_files_sharepoint(
             )
             
             if process_result["success"]:
-                # Atualiza histórico (usando timestamp do SharePoint)
+                # Atualiza histórico (usando timestamp do SharePoint; history_key distingue pasta principal vs subpasta)
                 history_service.update_file_history(
-                    filename=filename,
+                    filename=history_key,
                     work_item_id=process_result["work_item_id"],
                     file_path=None,
                     last_modified=last_modified_str
