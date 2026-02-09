@@ -341,7 +341,7 @@ Após configurar, execute a pipeline manualmente e verifique os logs:
 
 11. **Notificação Teams (opcional, 8:30 BRT)**:
     - Se houver Tasks que estão **Closed** no Azure DevOps mas não estavam no .mpp, a sync grava `backend/logs/closed_tasks_report.json`.
-    - Uma **segunda pipeline** (azure-pipelines-teams-notify.yml) agendada às **8:30 BRT** baixa esse relatório e envia **mensagem no Teams** (chat 1:1) para cada **PMO** (responsável pela Feature), listando as Tasks fechadas daquele Feature.
+    - Uma **segunda pipeline** (azure-pipelines-teams-notify.yml) agendada às **8:30 BRT** baixa esse relatório e envia **mensagem no Teams** (chat 1:1) para cada **PMO** (responsável pela Feature), listando as Tasks fechadas daquele Feature e os **links dos arquivos .mpp no SharePoint** para o PMO abrir e alterar diretamente (já que editar o .mpp no SharePoint é a boa prática; a notificação facilita o acesso).
 
 ### Formato do Nome do Arquivo
 

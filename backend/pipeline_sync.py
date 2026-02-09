@@ -395,31 +395,38 @@ def write_closed_tasks_report(
     closed_tasks_collector: List[Dict[str, Any]],
     devops_client: AzureDevOpsClient,
     logs_dir: Path,
+    file_name_to_web_url: Optional[Dict[str, str]] = None,
 ) -> Optional[Path]:
     """
-    Agrupa tasks fechadas por Feature, obtém AssignedTo (PMO) de cada Feature
-    e grava closed_tasks_report.json para uso pela notificação Teams (8:30).
+    Agrupa tasks fechadas por Feature, obtém AssignedTo (PMO) de cada Feature,
+    inclui links dos arquivos .mpp no SharePoint (quando disponíveis) e grava
+    closed_tasks_report.json para uso pela notificação Teams (8:30).
     """
     if not closed_tasks_collector:
         return None
     logs_dir = Path(logs_dir)
     logs_dir.mkdir(parents=True, exist_ok=True)
-    # Agrupa por feature_id
-    by_feature: Dict[int, List[Dict[str, Any]]] = {}
+    file_name_to_web_url = file_name_to_web_url or {}
+    # Agrupa por feature_id (tasks + set de nomes de arquivo .mpp)
+    by_feature: Dict[int, tuple] = {}  # (list of task dicts, set of file names)
     for item in closed_tasks_collector:
         fid = item.get("feature_id")
         if fid is None:
             continue
-        by_feature.setdefault(fid, []).append(
-            {
-                "task_id": item.get("task_id"),
-                "title": item.get("title"),
-                "mpp_status": item.get("mpp_status"),
-                "devops_state": item.get("devops_state"),
-            }
-        )
+        if fid not in by_feature:
+            by_feature[fid] = ([], set())
+        tasks_list, file_names = by_feature[fid]
+        tasks_list.append({
+            "task_id": item.get("task_id"),
+            "title": item.get("title"),
+            "mpp_status": item.get("mpp_status"),
+            "devops_state": item.get("devops_state"),
+        })
+        fname = (item.get("mpp_file_name") or "").strip()
+        if fname:
+            file_names.add(fname)
     features_report = []
-    for feature_id, tasks in by_feature.items():
+    for feature_id, (tasks, file_names) in by_feature.items():
         assigned_to_unique = None
         assigned_to_display = None
         try:
@@ -428,11 +435,16 @@ def write_closed_tasks_report(
                 assigned_to_unique, assigned_to_display = _extract_assigned_to_email(wi.fields)
         except Exception as e:
             logger.warning(f"Não foi possível obter responsável da Feature {feature_id}: {e}")
+        file_links = [
+            {"file_name": n, "web_url": file_name_to_web_url.get(n) or ""}
+            for n in sorted(file_names)
+        ]
         features_report.append({
             "feature_id": feature_id,
             "assigned_to_email": assigned_to_unique,
             "assigned_to_display_name": assigned_to_display,
             "closed_tasks": tasks,
+            "file_links": file_links,
         })
     report = {
         "generated_at": datetime.now().isoformat(),
@@ -548,7 +560,16 @@ def main() -> int:
                 files, history_service, file_processor, sharepoint_service,
                 closed_tasks_collector=closed_tasks_collector,
             )
-            write_closed_tasks_report(closed_tasks_collector, devops_client, backend_dir / "logs")
+            # Mapeamento nome do arquivo → URL no SharePoint (para links na notificação Teams)
+            file_name_to_web_url = {
+                f.get("name", ""): f.get("web_url") or f.get("webUrl") or ""
+                for f in (files or [])
+                if f.get("name")
+            }
+            write_closed_tasks_report(
+                closed_tasks_collector, devops_client, backend_dir / "logs",
+                file_name_to_web_url=file_name_to_web_url,
+            )
         except Exception as e:
             logger.exception(f"Erro ao processar arquivos do SharePoint: {e}")
             return 1
@@ -593,7 +614,10 @@ def main() -> int:
             mpp_files, history_service, file_processor,
             closed_tasks_collector=closed_tasks_collector,
         )
-        write_closed_tasks_report(closed_tasks_collector, devops_client, backend_dir / "logs")
+        write_closed_tasks_report(
+            closed_tasks_collector, devops_client, backend_dir / "logs",
+            file_name_to_web_url=None,
+        )
     
     # Imprime resumo
     print_summary(results)

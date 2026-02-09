@@ -413,6 +413,7 @@ class MapperService:
                         target_date=task.finish_date,
                         parent_feature_id=parent_feature_id,
                         closed_tasks_collector=closed_tasks_collector,
+                        mpp_file_name=parsed_data.project.file_name if parsed_data and parsed_data.project else None,
                     )
                 else:
                     # Mesmo sem update_existing, re-vincula se necessário
@@ -988,6 +989,7 @@ class MapperService:
         target_date: Optional[datetime] = None,
         parent_feature_id: Optional[int] = None,
         closed_tasks_collector: Optional[List[Dict[str, Any]]] = None,
+        mpp_file_name: Optional[str] = None,
     ):
         """
         Atualiza uma Task existente no Azure DevOps.
@@ -1037,6 +1039,7 @@ class MapperService:
                                 "title": title,
                                 "mpp_status": task.status or "",
                                 "devops_state": current_state,
+                                "mpp_file_name": mpp_file_name or "",
                             })
                     elif devops_state and devops_state.lower() == current_state_lower:
                         # Se ambos têm o mesmo status protegido, pode atualizar (mantém o status)

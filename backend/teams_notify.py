@@ -174,7 +174,20 @@ def run(report_path: Path) -> int:
                 tid = t.get("task_id")
                 title = (t.get("title") or "")[:80]
                 lines.append(f"  • Task {tid}: {title}")
-            lines.append(f"  Link: {base_url}/_workitems/edit/{fid}")
+            lines.append(f"  Link Azure DevOps: {base_url}/_workitems/edit/{fid}")
+            # Links dos arquivos .mpp no SharePoint (para alterar diretamente)
+            file_links = feat.get("file_links") or []
+            if file_links:
+                lines.append("")
+                lines.append("**Arquivos .mpp no SharePoint (para alterar e refletir as conclusões):**")
+                for link in file_links:
+                    name = link.get("file_name") or "(arquivo)"
+                    url = (link.get("web_url") or "").strip()
+                    if url:
+                        lines.append(f"  • {name}")
+                        lines.append(f"    {url}")
+                    else:
+                        lines.append(f"  • {name}")
             lines.append("")
         body_text = "\n".join(lines).strip()
         if _create_chat_and_send_message(token, email, body_text, requests):
