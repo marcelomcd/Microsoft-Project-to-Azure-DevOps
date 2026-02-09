@@ -59,8 +59,8 @@ steps:
     displayName: 'Baixar logs da última sincronização (6:30)'
     inputs:
       source: 'specific'
-      project: '$(System.TeamProject)'
-      pipeline: 'mpp_sync'
+      project: 'ALM'
+      pipeline: 'Qualiit.AzureProjects.ProjectIntegration'
       runVersion: 'latest'
       artifactName: 'sync_logs'
       targetPath: '$(Pipeline.Workspace)/sync_logs'
