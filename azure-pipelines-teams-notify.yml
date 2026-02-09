@@ -76,6 +76,7 @@ steps:
       export SHAREPOINT_CLIENT_SECRET="$(SHAREPOINT_CLIENT_SECRET)"
       export SHAREPOINT_TENANT_ID="$(SHAREPOINT_TENANT_ID)"
       export AZURE_DEVOPS_ORG="$(AZURE_DEVOPS_ORG)"
+      export TEAMS_VERIFICATION_EMAIL="$(TEAMS_VERIFICATION_EMAIL)"
       REPORT="$(Pipeline.Workspace)/sync_logs/closed_tasks_report.json"
       if [ -f "$REPORT" ]; then
         python teams_notify.py --report "$REPORT"
@@ -92,4 +93,5 @@ steps:
       SHAREPOINT_CLIENT_SECRET: $(SHAREPOINT_CLIENT_SECRET)
       SHAREPOINT_TENANT_ID: $(SHAREPOINT_TENANT_ID)
       AZURE_DEVOPS_ORG: $(AZURE_DEVOPS_ORG)
+      TEAMS_VERIFICATION_EMAIL: $(TEAMS_VERIFICATION_EMAIL)
     condition: succeeded()

@@ -224,6 +224,9 @@ Configure as seguintes variáveis em **Edit** → **Variables**:
 
 11. **`TEAMS_NOTIFICATION_ENABLED`**
     - **Valor**: `true` para ativar envio de mensagem no Teams para PMOs (tasks fechadas no DevOps)
+
+11.1. **`TEAMS_VERIFICATION_EMAIL`** (opcional)
+    - **Valor**: E-mail que recebe uma **cópia consolidada** de tudo que foi enviado aos PMOs (ex: `marcelo.macedo@qualiit.com.br`), para verificar se o script/pipeline funcionou. Se o e-mail for também PMO, recebe um resumo do que foi enviado aos outros.
     - **Tipo**: String (convertido para boolean)
     - **Secreto**: ❌ Não
 
@@ -240,6 +243,13 @@ Configure as seguintes variáveis em **Edit** → **Variables**:
     - Crie uma **nova Pipeline** no Azure DevOps que use o arquivo **`azure-pipelines-teams-notify.yml`**.
     - Em **Resources** (ou no YAML), defina a variável **`SYNC_PIPELINE_NAME`** com o **nome exato** da pipeline de sincronização (6:30).
     - Agendamento: 8h BRT (11:00 UTC). A pipeline baixa o artefato `sync_logs` da última execução da pipeline de sync e executa `teams_notify.py`.
+
+#### Teste local da notificação Teams
+- Para verificar se a mensagem chega no Teams antes de depender da pipeline: na pasta **`backend`**, com **`TEAMS_NOTIFICATION_ENABLED=true`** e credenciais Graph no `.env`, execute:
+  `python scripts/test_teams_notify_local.py`
+- Por padrão envia uma mensagem de **teste** para `marcelo.macedo@qualiit.com.br`. Para outro destinatário: `python scripts/test_teams_notify_local.py --email outro@qualiit.com.br`.
+- O script gera um `closed_tasks_report.json` de exemplo em `backend/logs/teams_notify_test/` e chama `teams_notify.py`; assim você confere no Teams se o envio está funcionando.
+- **Nota:** Se aparecer erro *"Creation of 'OneOnOne' chat requires 2 members"* ao usar **credenciais de aplicativo** (client_id/secret), o tenant pode exigir autenticação **delegada** (usuário) para criar o chat 1:1; nesse caso configure o envio via pipeline com identidade de usuário ou avalie uso de webhook/connector do Teams.
 
 #### Passo a Passo para Configurar Variáveis
 
@@ -351,6 +361,7 @@ Após configurar, execute a pipeline manualmente e verifique os logs:
 11. **Notificação Teams (opcional, 8h BRT)**:
     - Se houver Tasks que estão **Closed** no Azure DevOps mas não estavam no .mpp, a sync grava `backend/logs/closed_tasks_report.json`.
     - Uma **segunda pipeline** (azure-pipelines-teams-notify.yml) agendada às **8h BRT** baixa esse relatório e envia **mensagem no Teams** (chat 1:1) para cada **PMO** (responsável pela Feature), listando as Tasks fechadas daquele Feature e os **links dos arquivos .mpp no SharePoint** para o PMO abrir e alterar diretamente (já que editar o .mpp no SharePoint é a boa prática; a notificação facilita o acesso).
+    - Para cada PMO é gerado também um **log em HTML** com o corpo completo da mensagem enviada, em `logs/teams_notify/<email>.html` (ex: `jessica.barbosa_qualiit.com.br.html`), de forma estruturada e fácil de ler.
 
 ### Formato do Nome do Arquivo
 

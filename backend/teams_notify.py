@@ -3,6 +3,9 @@
 Envia notificação no Teams para cada PMO (responsável pela Feature) com a lista de
 Tasks que estão Closed no Azure DevOps mas não estavam no arquivo .mpp.
 
+Para cada PMO também gera um log em HTML com o corpo completo da mensagem enviada,
+em <diretório_do_report>/teams_notify/<email_sanitizado>.html (ex: jessica.barbosa_qualiit.com.br.html).
+
 Uso: python teams_notify.py [--report PATH]
 Requer: closed_tasks_report.json (gerado pela sync às 6:30) e variáveis Graph/Teams.
 Deve ser executado pela pipeline às 8h (após download do artefato da run 6:30).
@@ -27,6 +30,94 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+
+# Nome do subdiretório onde são gravados os logs HTML por PMO (relativo ao diretório do report)
+TEAMS_NOTIFY_LOG_SUBDIR = "teams_notify"
+
+
+def _sanitize_email_for_filename(email: str) -> str:
+    """Gera nome de arquivo seguro a partir do e-mail (ex: user@domain.com -> user_domain.com)."""
+    if not email:
+        return "sem_email"
+    return email.strip().replace("@", "_").replace(" ", "_")
+
+
+def _build_html_log(
+    email: str,
+    display_name: str,
+    features: list,
+    feature_link_fn,
+) -> str:
+    """
+    Gera o HTML do corpo da mensagem enviada ao PMO, de forma estruturada e fácil de ler.
+    """
+    from datetime import datetime
+    escaped = lambda s: (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+    now = datetime.now().strftime("%d/%m/%Y %H:%M")
+    parts = [
+        "<!DOCTYPE html>",
+        "<html lang=\"pt-BR\">",
+        "<head>",
+        "  <meta charset=\"utf-8\">",
+        "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+        f"  <title>Notificação Teams – {escaped(display_name or email)}</title>",
+        "  <style>",
+        "    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 24px; max-width: 720px; color: #242424; line-height: 1.5; }",
+        "    h1 { font-size: 1.25rem; color: #106ebe; margin-bottom: 8px; }",
+        "    h2 { font-size: 1.1rem; color: #323130; margin-top: 20px; margin-bottom: 8px; }",
+        "    .meta { color: #605e5c; font-size: 0.9rem; margin-bottom: 20px; }",
+        "    .intro { margin-bottom: 16px; }",
+        "    ul { margin: 8px 0; padding-left: 24px; }",
+        "    li { margin: 4px 0; }",
+        "    a { color: #106ebe; text-decoration: none; }",
+        "    a:hover { text-decoration: underline; }",
+        "    .feature-block { background: #faf9f8; border-left: 4px solid #106ebe; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; }",
+        "    .feature-block h3 { margin: 0 0 8px 0; font-size: 1rem; color: #106ebe; }",
+        "    .file-links { margin-top: 12px; }",
+        "    .file-links .file-name { font-weight: 600; }",
+        "    .file-links a { display: block; margin: 4px 0; word-break: break-all; }",
+        "    .task-assignee { color: #605e5c; font-size: 0.95em; }",
+        "  </style>",
+        "</head>",
+        "<body>",
+        f"  <h1>Notificação Teams – Tasks fechadas no Azure DevOps</h1>",
+        f"  <p class=\"meta\">Destinatário: <strong>{escaped(display_name or email)}</strong> &lt;{escaped(email)}&gt; · Gerado em {now}</p>",
+        "  <p class=\"intro\">A sincronização MPP → Azure DevOps identificou Tasks que já estão <strong>fechadas</strong> no Azure DevOps, mas que não estavam como concluídas no arquivo .mpp.</p>",
+        "  <h2>Tasks mantidas como fechadas (não alteradas)</h2>",
+    ]
+    for feat in features:
+        fid = feat.get("feature_id")
+        link_url = feature_link_fn(fid)
+        parts.append("  <div class=\"feature-block\">")
+        parts.append(f"    <h3>Feature {escaped(str(fid))}</h3>")
+        parts.append("    <ul>")
+        for t in feat.get("closed_tasks") or []:
+            tid = t.get("task_id")
+            title = (t.get("title") or "")[:80]
+            assignee = (t.get("task_assigned_to_display_name") or t.get("task_assigned_to_email") or "").strip()
+            if assignee:
+                parts.append(f"      <li>Task {escaped(str(tid))}: {escaped(title)} <span class=\"task-assignee\">(Responsável: {escaped(assignee)})</span></li>")
+            else:
+                parts.append(f"      <li>Task {escaped(str(tid))}: {escaped(title)}</li>")
+        parts.append("    </ul>")
+        parts.append(f"    <p><a href=\"{escaped(link_url)}\" target=\"_blank\" rel=\"noopener\">Abrir Feature no Azure DevOps</a></p>")
+        file_links = feat.get("file_links") or []
+        if file_links:
+            parts.append("    <div class=\"file-links\">")
+            parts.append("      <p><strong>Arquivos .mpp no SharePoint (para alterar e refletir as conclusões):</strong></p>")
+            for link in file_links:
+                name = link.get("file_name") or "(arquivo)"
+                url = (link.get("web_url") or "").strip()
+                if url:
+                    parts.append(f"      <p class=\"file-name\">{escaped(name)}</p>")
+                    parts.append(f"      <a href=\"{escaped(url)}\" target=\"_blank\" rel=\"noopener\">{escaped(url)}</a>")
+                else:
+                    parts.append(f"      <p class=\"file-name\">{escaped(name)}</p>")
+            parts.append("    </div>")
+        parts.append("  </div>")
+    parts.append("</body>")
+    parts.append("</html>")
+    return "\n".join(parts)
 
 
 def _get_graph_token() -> str:
@@ -61,13 +152,16 @@ def _create_chat_and_send_message(
 ) -> bool:
     """
     Cria chat 1:1 com o usuário (por email/UPN) e envia a mensagem.
+    Nota: com permissão de aplicativo (app-only), alguns tenants retornam
+    "Creation of 'OneOnOne' chat requires 2 members". Nesse caso use
+    autenticação delegada (usuário) ou considere webhook/connector do Teams.
     Retorna True se enviou com sucesso.
     """
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
     }
-    # Criar chat 1:1 (app + usuário)
+    # Criar chat 1:1 (doc: um membro; em app-only o tenant pode exigir 2)
     create_body = {
         "chatType": "oneOnOne",
         "members": [
@@ -181,7 +275,11 @@ def run(report_path: Path) -> int:
             for t in feat.get("closed_tasks") or []:
                 tid = t.get("task_id")
                 title = (t.get("title") or "")[:80]
-                lines.append(f"  • Task {tid}: {title}")
+                assignee = (t.get("task_assigned_to_display_name") or t.get("task_assigned_to_email") or "").strip()
+                if assignee:
+                    lines.append(f"  • Task {tid}: {title} (Responsável: {assignee})")
+                else:
+                    lines.append(f"  • Task {tid}: {title}")
             lines.append(f"  Link Azure DevOps: {feature_link(fid)}")
             # Links dos arquivos .mpp no SharePoint (para alterar diretamente)
             file_links = feat.get("file_links") or []
@@ -198,8 +296,70 @@ def run(report_path: Path) -> int:
                         lines.append(f"  • {name}")
             lines.append("")
         body_text = "\n".join(lines).strip()
+        # Log HTML com o corpo completo da mensagem enviada ao PMO (nome do arquivo = email sanitizado)
+        log_dir = report_path.parent / TEAMS_NOTIFY_LOG_SUBDIR
+        log_dir.mkdir(parents=True, exist_ok=True)
+        safe_name = _sanitize_email_for_filename(email)
+        html_path = log_dir / f"{safe_name}.html"
+        try:
+            html_content = _build_html_log(
+                email,
+                data["display"],
+                data["features"],
+                feature_link,
+            )
+            html_path.write_text(html_content, encoding="utf-8")
+            logger.info(f"Log HTML gravado: {html_path}")
+        except Exception as e:
+            logger.warning(f"Não foi possível gravar log HTML para {email}: {e}")
         if _create_chat_and_send_message(token, email, body_text, requests):
             sent += 1
+    # E-mail de verificação: envia uma mensagem consolidada com tudo que foi enviado aos PMOs
+    verification_email = (getattr(settings, "TEAMS_VERIFICATION_EMAIL", "") or "").strip()
+    if verification_email and verification_email not in by_email:
+        verification_lines = [
+            "**Relatório de verificação – Conteúdo enviado aos PMOs**",
+            "",
+            "Resumo do que foi enviado a cada responsável (Features/Tasks fechadas no DevOps que não estavam no .mpp):",
+            "",
+        ]
+        for email, data in by_email.items():
+            verification_lines.append(f"--- Enviado para: {data['display']} ({email}) ---")
+            for feat in data["features"]:
+                fid = feat.get("feature_id")
+                verification_lines.append(f"Feature {fid}")
+                for t in feat.get("closed_tasks") or []:
+                    tid = t.get("task_id")
+                    title = (t.get("title") or "")[:80]
+                    assignee = (t.get("task_assigned_to_display_name") or t.get("task_assigned_to_email") or "").strip()
+                    if assignee:
+                        verification_lines.append(f"  • Task {tid}: {title} (Responsável: {assignee})")
+                    else:
+                        verification_lines.append(f"  • Task {tid}: {title}")
+                verification_lines.append(f"  Link: {feature_link(fid)}")
+                for link in feat.get("file_links") or []:
+                    verification_lines.append(f"  .mpp: {link.get('file_name') or '(arquivo)'}")
+            verification_lines.append("")
+        verification_body = "\n".join(verification_lines).strip()
+        if _create_chat_and_send_message(token, verification_email, verification_body, requests):
+            logger.info(f"Mensagem de verificação enviada para {verification_email}")
+    elif verification_email and verification_email in by_email:
+        # Já recebeu a mensagem como PMO; opcionalmente enviar resumo dos outros
+        others = {e: d for e, d in by_email.items() if e != verification_email}
+        if others:
+            verification_lines = [
+                "**Relatório de verificação – Conteúdo enviado aos outros PMOs**",
+                "",
+            ]
+            for email, data in others.items():
+                verification_lines.append(f"--- Enviado para: {data['display']} ({email}) ---")
+                for feat in data["features"]:
+                    fid = feat.get("feature_id")
+                    verification_lines.append(f"Feature {fid}: {len(feat.get('closed_tasks') or [])} task(s)")
+                verification_lines.append("")
+            verification_body = "\n".join(verification_lines).strip()
+            if _create_chat_and_send_message(token, verification_email, verification_body, requests):
+                logger.info(f"Resumo de verificação (outros PMOs) enviado para {verification_email}")
     logger.info(f"Notificações enviadas: {sent}/{len(by_email)}")
     return 0
 

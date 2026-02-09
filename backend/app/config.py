@@ -160,7 +160,12 @@ class Settings(BaseSettings):
         default="",
         description="Tenant ID do Entra ID (pode ser o mesmo do SharePoint)"
     )
-    
+    # E-mail que recebe uma cópia consolidada de tudo que foi enviado aos PMOs (para verificação)
+    TEAMS_VERIFICATION_EMAIL: str = Field(
+        default="",
+        description="Se preenchido, recebe uma mensagem no Teams com o resumo de tudo enviado aos PMOs (ex: marcelo.macedo@qualiit.com.br)"
+    )
+
     @field_validator('TEAMS_NOTIFICATION_ENABLED', mode='before')
     @classmethod
     def parse_teams_notification_enabled(cls, v):
