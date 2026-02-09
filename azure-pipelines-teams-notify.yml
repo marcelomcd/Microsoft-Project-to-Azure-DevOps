@@ -14,12 +14,12 @@
 
 trigger: none
 
-# Pipeline de sync 6:30 BRT (nome exato como em Pipelines do Azure DevOps)
+# Pipeline de sync 6:30 BRT (nome e projeto exatos; project não pode ser variável)
 resources:
   pipelines:
   - pipeline: mpp_sync
     source: Qualiit.AzureProjects.ProjectIntegration
-    project: $(System.TeamProject)
+    project: ALM
 
 schedules:
   - cron: "0 11 * * *"   # 11:00 UTC = 8h BRT
