@@ -59,6 +59,8 @@ def _escape_html(s: str) -> str:
 def _teams_chat_deeplink(email: str) -> str:
     """
     Gera o deep link do Teams para abrir conversa 1:1 com o usuário.
+    Os responsáveis pelas tasks são os mesmos recursos do sistema (nome, sobrenome e e-mail
+    sempre disponíveis), então o link pode ser montado sempre que houver e-mail.
     Ver: https://learn.microsoft.com/en-us/microsoftteams/platform/concepts/build-and-test/deep-link-teams
     """
     if not (email or "").strip():
@@ -118,6 +120,7 @@ def _build_teams_message_html(
             devops_state = _escape_html((t.get("devops_state") or "—").strip())
             mpp_status = _escape_html((t.get("mpp_status") or "—").strip())
             motivo = f"Fechada no Azure DevOps ({devops_state}), ainda {mpp_status} no Microsoft Project."
+            # Responsável = mesmo recurso do sistema: sempre temos display_name (nome/sobrenome) e e-mail
             assignee_name = _escape_html(
                 (t.get("task_assigned_to_display_name") or t.get("task_assigned_to_email") or "").strip()
             )
@@ -219,6 +222,7 @@ def _build_html_log(
             devops_state = (t.get("devops_state") or "—").strip()
             mpp_status = (t.get("mpp_status") or "—").strip()
             motivo = f"Fechada no Azure DevOps ({devops_state}), ainda {mpp_status} no Microsoft Project."
+            # Mesmo recurso das tasks: nome/sobrenome e e-mail disponíveis para exibição e link Teams
             assignee_name = (t.get("task_assigned_to_display_name") or t.get("task_assigned_to_email") or "").strip()
             assignee_email = (t.get("task_assigned_to_email") or "").strip()
             if task_url:
