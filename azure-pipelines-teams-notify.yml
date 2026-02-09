@@ -14,12 +14,11 @@
 
 trigger: none
 
-# Substitua 'NomeDaPipelineDeSync' pelo nome exato da pipeline que roda às 6:30,
-# como aparece em Pipelines do Azure DevOps (ex.: Qualiit.AzureProjects.ProjectIntegration).
+# Pipeline de sync 6:30 BRT (nome exato como em Pipelines do Azure DevOps)
 resources:
   pipelines:
   - pipeline: mpp_sync
-    source: NomeDaPipelineDeSync
+    source: Qualiit.AzureProjects.ProjectIntegration
     project: $(System.TeamProject)
 
 schedules:
