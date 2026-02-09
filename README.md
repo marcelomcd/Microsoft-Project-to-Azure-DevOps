@@ -33,7 +33,7 @@ Sistema automatizado para sincronizar arquivos `.mpp` (Microsoft Project) do Sha
 - ✅ **Histórico de Sincronização**: Mantém registro completo de todas as operações
 - ✅ **Relatórios em HTML**: Logs de sincronização apenas em HTML, nomeados pelo ID da Feature (ex: `16073.html`), para análise futura
 - ✅ **Cache Otimizado**: Sistema de cache para melhor performance
-- ✅ **Notificação Teams**: Mensagem no Teams (chat 1:1) para cada PMO às 8h BRT com tasks fechadas no DevOps que não estavam no .mpp e **links dos arquivos .mpp no SharePoint** para edição (pipeline opcional separada)
+- ✅ **Notificação Teams**: Mensagem no Teams (chat 1:1) para cada PMO às 8h BRT com tasks fechadas no DevOps que não estavam no .mpp, **links dos arquivos .mpp no SharePoint** para edição e **nome do responsável por cada task com link que abre conversa no Teams** (não e-mail). Pipeline opcional separada no Azure Repos.
 
 ### Tecnologias Utilizadas
 
@@ -147,7 +147,14 @@ API_TIMEOUT=30
 
 ### Configuração da Pipeline Azure DevOps
 
-A pipeline está configurada para executar:
+No **Azure Repos** (Pipelines) existem **duas pipelines**:
+
+| Pipeline | Arquivo YAML | Agendamento | Descrição |
+|----------|----------------|-------------|-----------|
+| **Sync MPP → DevOps** | `azure-pipelines.yml` | 6:30 BRT (9:30 UTC) | Sincroniza arquivos .mpp do SharePoint com Work Items no Azure DevOps. |
+| **Notificação Teams** | `azure-pipelines-teams-notify.yml` | 8h BRT (11:00 UTC) | Baixa o relatório da sync e envia mensagem no Teams (chat 1:1) para cada PMO com tasks fechadas e links dos .mpp. |
+
+A pipeline principal (Sync) está configurada para executar:
 - **Agendamento**: Diariamente às 6:30h BRT
   - 6:30h BRT = 9:30h UTC
 - **Verificação de Alterações**: Processa apenas arquivos modificados desde a última sincronização
@@ -368,7 +375,7 @@ Após configurar, execute a pipeline manualmente e verifique os logs:
 
 11. **Notificação Teams (opcional, 8h BRT)**:
     - Se houver Tasks que estão **Closed** no Azure DevOps mas não estavam no .mpp, a sync grava `backend/logs/closed_tasks_report.json` com o **Assigned To (PMO) de cada Feature**.
-    - Uma **segunda pipeline** (azure-pipelines-teams-notify.yml) agendada às **8h BRT** baixa esse relatório e envia **mensagem no Teams** (chat 1:1) **para o responsável de cada Feature** (Assigned To no Azure DevOps): cada PMO recebe uma mensagem apenas com as Features e tasks fechadas das quais ele é responsável, mais os **links dos arquivos .mpp no SharePoint** para abrir e alterar (editar o .mpp no SharePoint é a boa prática).
+    - Uma **segunda pipeline** (`azure-pipelines-teams-notify.yml`) agendada às **8h BRT** baixa esse relatório e envia **mensagem no Teams** (chat 1:1) **para o responsável de cada Feature** (Assigned To no Azure DevOps): cada PMO recebe uma mensagem apenas com as Features e tasks fechadas das quais ele é responsável, mais os **links dos arquivos .mpp no SharePoint** para abrir e alterar. O **nome do responsável por cada task** na mensagem é um link que **abre diretamente a conversa no Teams** com essa pessoa (não e-mail).
     - Para cada PMO é gerado também um **log em HTML** com o corpo completo da mensagem enviada, em `logs/teams_notify/<email>.html` (ex: `jessica.barbosa_qualiit.com.br.html`), de forma estruturada e fácil de ler.
 
 ### Formato do Nome do Arquivo
@@ -458,9 +465,10 @@ O nome do arquivo `.mpp` deve seguir o padrão:
 │   ├── test_sharepoint_path.py   # Script para descobrir caminho SharePoint
 │   ├── requirements.txt          # Dependências Python
 │   └── env.example.txt           # Exemplo de variáveis de ambiente
-├── .gitignore                    # Arquivos ou pastas ignorados
-├── azure-pipelines.yml           # Definição da pipeline Azure DevOps
-└── README.md                     # Este arquivo
+├── .gitignore                           # Arquivos ou pastas ignorados
+├── azure-pipelines.yml                  # Pipeline Sync (6:30 BRT) — MPP → Azure DevOps
+├── azure-pipelines-teams-notify.yml     # Pipeline Notificação Teams (8h BRT)
+└── README.md                            # Este arquivo
 ```
 
 ---
@@ -625,12 +633,13 @@ Para problemas ou dúvidas:
 ---
 
 **Última atualização**: 09/02/2026  
-**Versão**: 1.1.0  
+**Versão**: 1.1.1  
 
 ### Histórico de versões
 
 | Versão | Data | Alterações |
 |--------|------|------------|
+| **1.1.1** | 09/02/2026 | Notificação Teams: nome do responsável por cada task abre **conversa no Teams** (deep link), não e-mail. Documentação no código: responsáveis = recursos (nome e e-mail sempre disponíveis). README: tabela das duas pipelines no Azure Repos (Sync 6:30 + Notificação 8h) e link do responsável na mensagem. |
 | **1.1.0** | 09/02/2026 | Notificação Teams: mensagem no Teams (chat 1:1) para cada PMO às 8h BRT com tasks fechadas no DevOps que não estavam no .mpp; links dos arquivos .mpp no SharePoint na mensagem; link da Feature no board do Azure DevOps (formato `.../Features?workitem=ID`). Pipeline opcional 8h (azure-pipelines-teams-notify.yml). |
 | **1.0.6** | 09/02/2026 | Sync considera pasta principal e subpastas no SharePoint (um nível, por cliente). Chave de histórico por pasta. README com nova lógica e variável SHAREPOINT_FOLDER_PATH. Regra de commit/push para Azure DevOps. Pasta .cursor no .gitignore. |
 | **1.0.5** | 06/02/2026 | Relatório de sync: Task em amarelo, User Story em azul; recurso "Cliente" apenas no template. Ajustes no resource mapper (Vladimir Davelli). |
