@@ -55,17 +55,10 @@ steps:
     displayName: 'Instalar dependências Python'
     workingDirectory: '$(System.DefaultWorkingDirectory)'
 
-  # pipeline = definition ID da pipeline de sync (ver em Pipelines > nome da pipeline, ex: "Nome (31)")
-  - task: DownloadPipelineArtifact@2
+  # Usa o recurso mpp_sync já resolvido (evita "No builds exist" da task com pipeline ID)
+  - download: mpp_sync
     displayName: 'Baixar logs da última sincronização (6:30)'
-    inputs:
-      source: 'specific'
-      project: 'ALM'
-      pipeline: 31
-      runVersion: 'latest'
-      artifactName: 'sync_logs'
-      targetPath: '$(Pipeline.Workspace)/sync_logs'
-    condition: succeeded()
+    artifact: sync_logs
 
   - script: |
       cd backend
@@ -80,7 +73,7 @@ steps:
       export TEAMS_VERIFICATION_EMAIL="$(TEAMS_VERIFICATION_EMAIL)"
       export TEAMS_REFRESH_TOKEN="$(TEAMS_REFRESH_TOKEN)"
       export AZURE_DEVOPS_FEATURE_BOARD_BASE_URL="$(AZURE_DEVOPS_FEATURE_BOARD_BASE_URL)"
-      REPORT="$(Pipeline.Workspace)/sync_logs/closed_tasks_report.json"
+      REPORT="$(Pipeline.Workspace)/mpp_sync/sync_logs/closed_tasks_report.json"
       if [ -f "$REPORT" ]; then
         python teams_notify.py --report "$REPORT"
       else
