@@ -222,6 +222,8 @@ Configure as seguintes variáveis em **Edit** → **Variables**:
 
 #### Variáveis para Notificação Teams (opcional, pipeline 8h)
 
+Para **replicar o seu `.env` local** nas pipelines do Azure DevOps (sem commitar segredos), use a lista completa em **[docs/PIPELINE_VARIABLES_AZURE_DEVOPS.md](docs/PIPELINE_VARIABLES_AZURE_DEVOPS.md)** — sync (6:30) e notificação Teams (8h).
+
 11. **`TEAMS_NOTIFICATION_ENABLED`**
     - **Valor**: `true` para ativar envio de mensagem no Teams para PMOs (tasks fechadas no DevOps)
 
