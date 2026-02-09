@@ -14,7 +14,7 @@
 
 trigger: none
 
-# Pipeline de sync 6:30 BRT (nome e projeto exatos; project não pode ser variável)
+# Pipeline de sync 6:30 BRT (ID 31 = Qualiit.AzureProjects.ProjectIntegration no projeto ALM)
 resources:
   pipelines:
   - pipeline: mpp_sync
@@ -55,12 +55,13 @@ steps:
     displayName: 'Instalar dependências Python'
     workingDirectory: '$(System.DefaultWorkingDirectory)'
 
+  # pipeline = definition ID da pipeline de sync (ver em Pipelines > nome da pipeline, ex: "Nome (31)")
   - task: DownloadPipelineArtifact@2
     displayName: 'Baixar logs da última sincronização (6:30)'
     inputs:
       source: 'specific'
       project: 'ALM'
-      pipeline: 'Qualiit.AzureProjects.ProjectIntegration'
+      pipeline: 31
       runVersion: 'latest'
       artifactName: 'sync_logs'
       targetPath: '$(Pipeline.Workspace)/sync_logs'
