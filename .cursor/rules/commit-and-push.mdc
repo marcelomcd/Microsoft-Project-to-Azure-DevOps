@@ -10,7 +10,7 @@ Ao concluir alterações neste repositório (script de sincronização MPP, pipe
 1. **Sempre** executar:
    - `git add` dos arquivos modificados/criados (excluir apenas o que não deve ir para o repositório, ex.: .env, arquivos de log).
    - `git commit` com mensagem clara e descritiva (ex.: "feat: ...", "fix: ...", "docs: ...").
-   - `git push origin main` (ou o branch atual).
+   - **`git push azure main`** — repositório do projeto: Azure DevOps (qualiit/ALM/Qualiit.AzureProjects.ProjectIntegration). Se quiser também no GitHub, depois: `git push origin main`.
 
 2. **Não** pedir confirmação ao usuário para fazer o push; assumir que ele quer as alterações versionadas e enviadas.
 
