@@ -33,13 +33,14 @@ Sistema automatizado para sincronizar arquivos `.mpp` (Microsoft Project) do Sha
 - ✅ **Histórico de Sincronização**: Mantém registro completo de todas as operações
 - ✅ **Relatórios em HTML**: Logs de sincronização apenas em HTML, nomeados pelo ID da Feature (ex: `16073.html`), para análise futura
 - ✅ **Cache Otimizado**: Sistema de cache para melhor performance
+- ✅ **Notificação Teams**: Mensagem no Teams (chat 1:1) para cada PMO às 8h BRT com tasks fechadas no DevOps que não estavam no .mpp e **links dos arquivos .mpp no SharePoint** para edição (pipeline opcional separada)
 
 ### Tecnologias Utilizadas
 
 - **Backend**: Python 3.10+, FastAPI, Pydantic
 - **Parsing MPP**: MPXJ (Java) via CLI
-- **Integração**: Azure DevOps REST API, Microsoft Graph API (SharePoint)
-- **Pipeline**: Azure DevOps Pipelines (YAML)
+- **Integração**: Azure DevOps REST API, Microsoft Graph API (SharePoint, Teams)
+- **Pipeline**: Azure DevOps Pipelines (YAML) — sync 6:30 BRT, notificação Teams 8h BRT (opcional)
 - **Autenticação**: OAuth2 (Microsoft Entra ID), PAT (Azure DevOps)
 
 ---
@@ -69,6 +70,8 @@ AzureDevOpsClient (API)
 Azure DevOps (Work Items)
 ```
 
+**Notificação Teams (opcional):** Uma segunda pipeline agendada às **8h BRT** baixa o relatório `closed_tasks_report.json` da sync e envia mensagem no **Teams** (chat 1:1) para cada PMO com a lista de tasks fechadas e links dos .mpp no SharePoint. Ver [Configuração – Notificação Teams](#variáveis-para-notificação-teams-opcional-pipeline-8h).
+
 ### Componentes Principais
 
 1. **`pipeline_sync.py`**: Script principal executado pela pipeline
@@ -79,6 +82,7 @@ Azure DevOps (Work Items)
 6. **`SharePointFileService`**: Gerencia download de arquivos do SharePoint
 7. **`SyncHistoryService`**: Mantém histórico de sincronizações
 8. **`SyncLogger`**: Gera relatórios HTML de sincronização (nomeados pelo ID da Feature)
+9. **`teams_notify.py`**: Envia notificação no Teams para PMOs (tasks fechadas + links .mpp no SharePoint), executado pela pipeline das 8h
 
 ---
 
@@ -602,6 +606,9 @@ Para problemas ou dúvidas:
 ---
 
 **Última atualização**: 09/02/2026  
-**Versão**: 1.0.6
+**Versão**: 1.1.0  
+- *1.1.0* (09/02/2026): Notificação Teams (chat 1:1 por PMO às 8h BRT), links dos .mpp no SharePoint na mensagem, link da Feature no board do Azure DevOps.  
+- *1.0.6*: Sync pasta principal + subpastas SharePoint, relatórios HTML por Feature.
+
 **Desenvolvido por**: Marcelo Macedo  
 **E-mail**: [marcelo.macedo@qualiit.com.br](mailto:marcelo.macedo@qualiit.com.br)
