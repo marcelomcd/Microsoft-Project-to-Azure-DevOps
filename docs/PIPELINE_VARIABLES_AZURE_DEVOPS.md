@@ -38,7 +38,7 @@ Use os mesmos valores do `.env` onde indicado. Para Graph (envio de mensagem), n
 | `AZURE_DEVOPS_ORG` | Do `.env`: `AZURE_DEVOPS_ORG` | Não |
 | `TEAMS_VERIFICATION_EMAIL` | E-mail que recebe cópia (ex.: `marcelo.macedo@qualiit.com.br`) | Não |
 | `TEAMS_REFRESH_TOKEN` | Do `.env`: `TEAMS_REFRESH_TOKEN` | Sim |
-| `AZURE_DEVOPS_FEATURE_BOARD_BASE_URL` | Opcional; URL base do board de Features para links na mensagem | Não |
+| `AZURE_DEVOPS_FEATURE_BOARD_BASE_URL` | Opcional. URL base do board de Features **sem** `?workitem=` (ex.: `https://dev.azure.com/qualiit/.../Features`). O script acrescenta `?workitem=ID` automaticamente. | Não |
 
 ---
 

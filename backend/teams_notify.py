@@ -57,11 +57,13 @@ def _escape_html(s: str) -> str:
 
 def _build_teams_message_html(
     features_data: list,
-    feature_link_fn,
+    work_item_link_fn,
     intro_title: str = "Tasks mantidas como fechadas (não alteradas)",
 ) -> str:
     """
-    Monta o corpo da mensagem no Teams em HTML: quebras de linha, negrito e links clicáveis.
+    Monta o corpo da mensagem no Teams em HTML: título com links (Feature | Microsoft Project),
+    tasks com link, motivo (status DevOps vs .mpp) e responsável com mailto.
+    Tasks duplicadas (mesmo task_id) são mostradas uma vez.
     """
     parts = [
         "<p>Olá,</p>",
@@ -72,26 +74,51 @@ def _build_teams_message_html(
     ]
     for feat in features_data:
         fid = feat.get("feature_id")
-        link_url = feature_link_fn(fid)
-        parts.append(f"<p><strong>Feature {_escape_html(str(fid))}</strong></p>")
+        feature_url = work_item_link_fn(fid)
+        file_links = feat.get("file_links") or []
+        mpp_url = (file_links[0].get("web_url") or "").strip() if file_links else ""
+        mpp_label = "Microsoft Project"
+        if mpp_url:
+            parts.append(
+                f'<p><strong><a href="{_escape_html(feature_url)}">Feature</a> | '
+                f'<a href="{_escape_html(mpp_url)}">{_escape_html(mpp_label)}</a> {_escape_html(str(fid))}</strong></p>'
+            )
+        else:
+            parts.append(
+                f'<p><strong><a href="{_escape_html(feature_url)}">Feature</a> {_escape_html(str(fid))}</strong></p>'
+            )
         parts.append("<ul>")
+        seen_task_ids = set()
         for t in feat.get("closed_tasks") or []:
             tid = t.get("task_id")
+            if tid is not None and tid in seen_task_ids:
+                continue
+            if tid is not None:
+                seen_task_ids.add(tid)
             title = _escape_html((t.get("title") or "")[:80])
-            assignee = _escape_html(
+            task_url = work_item_link_fn(tid) if tid is not None else ""
+            devops_state = _escape_html((t.get("devops_state") or "—").strip())
+            mpp_status = _escape_html((t.get("mpp_status") or "—").strip())
+            motivo = f"Fechada no Azure DevOps ({devops_state}), ainda {mpp_status} no Microsoft Project."
+            assignee_name = _escape_html(
                 (t.get("task_assigned_to_display_name") or t.get("task_assigned_to_email") or "").strip()
             )
-            if assignee:
-                parts.append(f"<li>Task {tid}: {title} (Responsável: {assignee})</li>")
+            assignee_email = (t.get("task_assigned_to_email") or "").strip()
+            if task_url:
+                task_part = f'<strong><a href="{_escape_html(task_url)}">Task {tid}</a>: {title}</strong>'
             else:
-                parts.append(f"<li>Task {tid}: {title}</li>")
+                task_part = f"<strong>Task {tid}: {title}</strong>"
+            parts.append(f"<li>{task_part} — {_escape_html(motivo)}")
+            if assignee_name:
+                if assignee_email:
+                    parts.append(f' Responsável: <a href="mailto:{_escape_html(assignee_email)}">{_escape_html(assignee_name)}</a>')
+                else:
+                    parts.append(f" Responsável: {_escape_html(assignee_name)}")
+            parts.append("</li>")
         parts.append("</ul>")
-        parts.append(f'<p><a href="{_escape_html(link_url)}">Abrir Feature no Azure DevOps</a></p>')
-        file_links = feat.get("file_links") or []
-        if file_links:
-            parts.append("<p><strong>Arquivos .mpp no SharePoint (para alterar e refletir as conclusões):</strong></p>")
-            parts.append("<ul>")
-            for link in file_links:
+        if len(file_links) > 1:
+            parts.append("<p><strong>Outros arquivos .mpp desta Feature:</strong></p><ul>")
+            for link in file_links[1:]:
                 name = _escape_html(link.get("file_name") or "(arquivo)")
                 url = (link.get("web_url") or "").strip()
                 if url:
@@ -107,10 +134,10 @@ def _build_html_log(
     email: str,
     display_name: str,
     features: list,
-    feature_link_fn,
+    work_item_link_fn,
 ) -> str:
     """
-    Gera o HTML do corpo da mensagem enviada ao PMO, de forma estruturada e fácil de ler.
+    Gera o HTML do corpo da mensagem enviada ao PMO (mesmo formato da mensagem Teams).
     """
     from datetime import datetime
     escaped = lambda s: (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
@@ -138,6 +165,7 @@ def _build_html_log(
         "    .file-links .file-name { font-weight: 600; }",
         "    .file-links a { display: block; margin: 4px 0; word-break: break-all; }",
         "    .task-assignee { color: #605e5c; font-size: 0.95em; }",
+        "    .task-motivo { color: #605e5c; font-size: 0.9em; }",
         "  </style>",
         "</head>",
         "<body>",
@@ -148,30 +176,49 @@ def _build_html_log(
     ]
     for feat in features:
         fid = feat.get("feature_id")
-        link_url = feature_link_fn(fid)
+        feature_url = work_item_link_fn(fid)
+        file_links = feat.get("file_links") or []
+        mpp_url = (file_links[0].get("web_url") or "").strip() if file_links else ""
         parts.append("  <div class=\"feature-block\">")
-        parts.append(f"    <h3>Feature {escaped(str(fid))}</h3>")
+        if mpp_url:
+            parts.append(f"    <h3><a href=\"{escaped(feature_url)}\" target=\"_blank\" rel=\"noopener\">Feature</a> | <a href=\"{escaped(mpp_url)}\" target=\"_blank\" rel=\"noopener\">Microsoft Project</a> {escaped(str(fid))}</h3>")
+        else:
+            parts.append(f"    <h3><a href=\"{escaped(feature_url)}\" target=\"_blank\" rel=\"noopener\">Feature</a> {escaped(str(fid))}</h3>")
         parts.append("    <ul>")
+        seen_task_ids = set()
         for t in feat.get("closed_tasks") or []:
             tid = t.get("task_id")
+            if tid is not None and tid in seen_task_ids:
+                continue
+            if tid is not None:
+                seen_task_ids.add(tid)
             title = (t.get("title") or "")[:80]
-            assignee = (t.get("task_assigned_to_display_name") or t.get("task_assigned_to_email") or "").strip()
-            if assignee:
-                parts.append(f"      <li>Task {escaped(str(tid))}: {escaped(title)} <span class=\"task-assignee\">(Responsável: {escaped(assignee)})</span></li>")
+            task_url = work_item_link_fn(tid) if tid is not None else ""
+            devops_state = (t.get("devops_state") or "—").strip()
+            mpp_status = (t.get("mpp_status") or "—").strip()
+            motivo = f"Fechada no Azure DevOps ({devops_state}), ainda {mpp_status} no Microsoft Project."
+            assignee_name = (t.get("task_assigned_to_display_name") or t.get("task_assigned_to_email") or "").strip()
+            assignee_email = (t.get("task_assigned_to_email") or "").strip()
+            if task_url:
+                parts.append(f"      <li><strong><a href=\"{escaped(task_url)}\" target=\"_blank\" rel=\"noopener\">Task {escaped(str(tid))}</a>: {escaped(title)}</strong>")
             else:
-                parts.append(f"      <li>Task {escaped(str(tid))}: {escaped(title)}</li>")
+                parts.append(f"      <li><strong>Task {escaped(str(tid))}: {escaped(title)}</strong>")
+            parts.append(f" <span class=\"task-motivo\">— {escaped(motivo)}</span>")
+            if assignee_name:
+                if assignee_email:
+                    parts.append(f' <span class=\"task-assignee\">Responsável: <a href=\"mailto:{escaped(assignee_email)}\">{escaped(assignee_name)}</a></span>')
+                else:
+                    parts.append(f" <span class=\"task-assignee\">Responsável: {escaped(assignee_name)}</span>")
+            parts.append("</li>")
         parts.append("    </ul>")
-        parts.append(f"    <p><a href=\"{escaped(link_url)}\" target=\"_blank\" rel=\"noopener\">Abrir Feature no Azure DevOps</a></p>")
-        file_links = feat.get("file_links") or []
         if file_links:
             parts.append("    <div class=\"file-links\">")
-            parts.append("      <p><strong>Arquivos .mpp no SharePoint (para alterar e refletir as conclusões):</strong></p>")
+            parts.append("      <p><strong>Arquivos .mpp no SharePoint:</strong></p>")
             for link in file_links:
                 name = link.get("file_name") or "(arquivo)"
                 url = (link.get("web_url") or "").strip()
                 if url:
-                    parts.append(f"      <p class=\"file-name\">{escaped(name)}</p>")
-                    parts.append(f"      <a href=\"{escaped(url)}\" target=\"_blank\" rel=\"noopener\">{escaped(url)}</a>")
+                    parts.append(f"      <p class=\"file-name\"><a href=\"{escaped(url)}\" target=\"_blank\" rel=\"noopener\">{escaped(name)}</a></p>")
                 else:
                     parts.append(f"      <p class=\"file-name\">{escaped(name)}</p>")
             parts.append("    </div>")
@@ -395,18 +442,19 @@ def run(report_path: Path) -> int:
     if use_delegated and not initiator_user_id:
         logger.warning("Token delegado ativo mas não foi possível obter o ID do usuário (/me); o envio pode falhar com 'requires 2 members'.")
     sent = 0
-    # Link da Feature: board de Features se configurado, senão _workitems/edit
+    # Link para work items (Feature ou Task): evita duplicar ?workitem= na URL
     feature_board_base = (getattr(settings, "AZURE_DEVOPS_FEATURE_BOARD_BASE_URL", "") or "").strip().rstrip("/")
     if feature_board_base:
-        def feature_link(fid):
-            return f"{feature_board_base}?workitem={fid}"
+        base_clean = feature_board_base.split("?")[0].rstrip("/")
+        def work_item_link(wi_id):
+            return f"{base_clean}?workitem={wi_id}"
     else:
         org = getattr(settings, "AZURE_DEVOPS_ORG", "qualiit")
         base_url = f"https://dev.azure.com/{org}"
-        def feature_link(fid):
-            return f"{base_url}/_workitems/edit/{fid}"
+        def work_item_link(wi_id):
+            return f"{base_url}/_workitems/edit/{wi_id}"
     for email, data in by_email.items():
-        body_content = _build_teams_message_html(data["features"], feature_link)
+        body_content = _build_teams_message_html(data["features"], work_item_link)
         # Log HTML com o corpo completo da mensagem enviada ao PMO (nome do arquivo = email sanitizado)
         log_dir = report_path.parent / TEAMS_NOTIFY_LOG_SUBDIR
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -417,7 +465,7 @@ def run(report_path: Path) -> int:
                 email,
                 data["display"],
                 data["features"],
-                feature_link,
+                work_item_link,
             )
             html_path.write_text(html_content, encoding="utf-8")
             logger.info(f"Log HTML gravado: {html_path}")
@@ -440,7 +488,7 @@ def run(report_path: Path) -> int:
             )
             for feat in data["features"]:
                 fid = feat.get("feature_id")
-                link_url = feature_link(fid)
+                link_url = work_item_link(fid)
                 verification_parts.append(f'<p>Feature {fid} – <a href="{_escape_html(link_url)}">Abrir no Azure DevOps</a></p>')
                 verification_parts.append("<ul>")
                 for t in feat.get("closed_tasks") or []:
