@@ -6,11 +6,14 @@
 #
 # Pré-requisitos:
 # 1. Criar uma nova Pipeline no Azure DevOps que use este arquivo (azure-pipelines-teams-notify.yml).
-# 2. Em Resources → Pipelines, adicionar referência à pipeline de sincronização:
-#    - Pipeline: selecione a pipeline que roda às 6:30 (ex.: "Qualiit.AzureProjects.ProjectIntegration" ou o nome que você deu).
-# 3. Variáveis: TEAMS_NOTIFICATION_ENABLED=true, GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET, GRAPH_TENANT_ID
-#    (ou use as mesmas do SharePoint se for o mesmo app, e conceda permissões Chat.Create, ChatMessage.Send no Graph).
-#    Opcional: TEAMS_REFRESH_TOKEN (variável secreta) para enviar como usuário e evitar erro "requires 2 members".
+# 2. Pipeline > Variables: definir TEAMS_NOTIFICATION_ENABLED=true e as variáveis abaixo (obrigatório para envio).
+#    Sem elas o step não quebra, mas nenhuma mensagem é enviada (log: "TEAMS_NOTIFICATION_ENABLED não está ativo").
+#    - TEAMS_NOTIFICATION_ENABLED = true
+#    - GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET, GRAPH_TENANT_ID
+#    - TEAMS_REFRESH_TOKEN (secret, recomendado; obter com python scripts/get_teams_refresh_token.py)
+#    - TEAMS_VERIFICATION_EMAIL, AZURE_DEVOPS_ORG
+#    - Opcional: SHAREPOINT_*, AZURE_DEVOPS_FEATURE_BOARD_BASE_URL
+# 3. O recurso mpp_sync referencia a pipeline de sync (6:30); nome/projeto em resources.pipelines abaixo.
 
 trigger: none
 
@@ -60,19 +63,9 @@ steps:
     displayName: 'Baixar logs da última sincronização (6:30)'
     artifact: sync_logs
 
+  # Variáveis vêm do env: abaixo (configurar na Pipeline > Variables da pipeline de notificação Teams)
   - script: |
       cd backend
-      export TEAMS_NOTIFICATION_ENABLED="$(TEAMS_NOTIFICATION_ENABLED)"
-      export GRAPH_CLIENT_ID="$(GRAPH_CLIENT_ID)"
-      export GRAPH_CLIENT_SECRET="$(GRAPH_CLIENT_SECRET)"
-      export GRAPH_TENANT_ID="$(GRAPH_TENANT_ID)"
-      export SHAREPOINT_CLIENT_ID="$(SHAREPOINT_CLIENT_ID)"
-      export SHAREPOINT_CLIENT_SECRET="$(SHAREPOINT_CLIENT_SECRET)"
-      export SHAREPOINT_TENANT_ID="$(SHAREPOINT_TENANT_ID)"
-      export AZURE_DEVOPS_ORG="$(AZURE_DEVOPS_ORG)"
-      export TEAMS_VERIFICATION_EMAIL="$(TEAMS_VERIFICATION_EMAIL)"
-      export TEAMS_REFRESH_TOKEN="$(TEAMS_REFRESH_TOKEN)"
-      export AZURE_DEVOPS_FEATURE_BOARD_BASE_URL="$(AZURE_DEVOPS_FEATURE_BOARD_BASE_URL)"
       REPORT="$(Pipeline.Workspace)/mpp_sync/sync_logs/closed_tasks_report.json"
       if [ -f "$REPORT" ]; then
         python teams_notify.py --report "$REPORT"
