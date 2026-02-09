@@ -31,7 +31,8 @@ backend/.env
 backend/test_sharepoint.ps1
 backend/test_sharepoint_local.bat
 
-# IDEs
+# IDEs e Cursor
+.cursor/
 .vscode/
 .idea/
 *.sublime-project
