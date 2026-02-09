@@ -5,7 +5,7 @@ Tasks que estão Closed no Azure DevOps mas não estavam no arquivo .mpp.
 
 Uso: python teams_notify.py [--report PATH]
 Requer: closed_tasks_report.json (gerado pela sync às 6:30) e variáveis Graph/Teams.
-Deve ser executado pela pipeline às 8:30 (após download do artefato da run 6:30).
+Deve ser executado pela pipeline às 8h (após download do artefato da run 6:30).
 """
 import argparse
 import json
@@ -155,8 +155,16 @@ def run(report_path: Path) -> int:
         logger.error(f"Não foi possível obter token Graph: {e}")
         return 1
     sent = 0
-    org = getattr(settings, "AZURE_DEVOPS_ORG", "qualiit")
-    base_url = f"https://dev.azure.com/{org}"
+    # Link da Feature: board de Features se configurado, senão _workitems/edit
+    feature_board_base = (getattr(settings, "AZURE_DEVOPS_FEATURE_BOARD_BASE_URL", "") or "").strip().rstrip("/")
+    if feature_board_base:
+        def feature_link(fid):
+            return f"{feature_board_base}?workitem={fid}"
+    else:
+        org = getattr(settings, "AZURE_DEVOPS_ORG", "qualiit")
+        base_url = f"https://dev.azure.com/{org}"
+        def feature_link(fid):
+            return f"{base_url}/_workitems/edit/{fid}"
     for email, data in by_email.items():
         lines = [
             "Olá,",
@@ -174,7 +182,7 @@ def run(report_path: Path) -> int:
                 tid = t.get("task_id")
                 title = (t.get("title") or "")[:80]
                 lines.append(f"  • Task {tid}: {title}")
-            lines.append(f"  Link Azure DevOps: {base_url}/_workitems/edit/{fid}")
+            lines.append(f"  Link Azure DevOps: {feature_link(fid)}")
             # Links dos arquivos .mpp no SharePoint (para alterar diretamente)
             file_links = feat.get("file_links") or []
             if file_links:

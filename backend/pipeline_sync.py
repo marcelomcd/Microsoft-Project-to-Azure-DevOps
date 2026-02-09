@@ -400,7 +400,7 @@ def write_closed_tasks_report(
     """
     Agrupa tasks fechadas por Feature, obtém AssignedTo (PMO) de cada Feature,
     inclui links dos arquivos .mpp no SharePoint (quando disponíveis) e grava
-    closed_tasks_report.json para uso pela notificação Teams (8:30).
+    closed_tasks_report.json para uso pela notificação Teams (8h).
     """
     if not closed_tasks_collector:
         return None

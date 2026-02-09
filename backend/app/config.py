@@ -48,7 +48,12 @@ class Settings(BaseSettings):
         default="",
         description="Personal Access Token do Azure DevOps (obrigatório via env var)"
     )
-    
+    # Link do board de Features (notificação Teams). O link da Feature é: este base + ?workitem=ID.
+    AZURE_DEVOPS_FEATURE_BOARD_BASE_URL: str = Field(
+        default="https://dev.azure.com/qualiit/Quali%20IT%20-%20Inova%C3%A7%C3%A3o%20e%20Tecnologia/_boards/board/t/Quali%20IT%20!%20Gestao%20de%20Projeto/Features",
+        description="URL base do board de Features (sem ?workitem=). Usado nos links da notificação Teams."
+    )
+
     @property
     def azure_devops_base_url(self) -> str:
         """URL base do Azure DevOps."""

@@ -1,6 +1,6 @@
-# Pipeline de notificação Teams (8:30 BRT)
+# Pipeline de notificação Teams (8h BRT)
 #
-# Executa às 8:30h BRT; baixa o artefato sync_logs da última execução da pipeline de
+# Executa às 8h BRT; baixa o artefato sync_logs da última execução da pipeline de
 # sincronização (6:30) e envia mensagem no Teams para cada PMO com a lista de Tasks
 # que estão fechadas no Azure DevOps mas não estavam no .mpp.
 #
@@ -22,8 +22,8 @@ resources:
     project: $(System.TeamProject)
 
 schedules:
-  - cron: "30 11 * * *"  # 11:30 UTC = 8:30 BRT
-    displayName: Notificação Teams - 8:30h BRT
+  - cron: "0 11 * * *"   # 11:00 UTC = 8h BRT
+    displayName: Notificação Teams - 8h BRT
     branches:
       include:
         - main
