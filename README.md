@@ -23,7 +23,7 @@ Sistema automatizado para sincronizar arquivos `.mpp` (Microsoft Project) do Sha
 
 - ✅ **Sincronização Automatizada**: Pipeline agendada executa diariamente às 6:30h BRT
 - ✅ **Verificação de Alterações**: Processa apenas arquivos modificados desde a última sincronização
-- ✅ **Integração SharePoint**: Busca e processa arquivos `.mpp` automaticamente do SharePoint
+- ✅ **Integração SharePoint**: Busca e processa arquivos `.mpp` automaticamente do SharePoint (pasta principal e subpastas de clientes)
 - ✅ **Identificação Automática**: Extrai Feature ID dos primeiros 5 dígitos do nome do arquivo
 - ✅ **Busca Inteligente**: Busca User Stories e Tasks pelo nome exato antes de criar
 - ✅ **Atualização Condicional**: Atualiza apenas se o arquivo foi modificado recentemente
@@ -167,10 +167,10 @@ Configure as seguintes variáveis em **Edit** → **Variables**:
    - **Nota**: Use o formato `https://tenant.sharepoint.com/sites/site-name` (não `tenant-my.sharepoint.com`)
 
 3. **`SHAREPOINT_FOLDER_PATH`**
-   - **Valor**: Nome da pasta dentro da biblioteca de documentos
+   - **Valor**: Nome da pasta principal dentro da biblioteca de documentos (ex.: `Cronogramas - Project`)
    - **Tipo**: String
    - **Secreto**: ❌ Não
-   - **Importante**: Não inclua o nome da biblioteca no caminho, pois o código já seleciona a biblioteca automaticamente
+   - **Importante**: Não inclua o nome da biblioteca no caminho; o código já seleciona a biblioteca. Os arquivos `.mpp` são buscados **na pasta principal e em todas as subpastas** (ex.: pastas com nome do cliente).
 
 4. **`SHAREPOINT_CLIENT_ID`**
    - **Valor**: Client ID do App Registration
@@ -257,7 +257,7 @@ Para configurar o acesso ao SharePoint, você precisa criar um App Registration:
 Após configurar, execute a pipeline manualmente e verifique os logs:
 
 - ✅ Se encontrar a pasta, verá: `✅ Pasta encontrada: [nome da pasta]`
-- ✅ Se encontrar arquivos .mpp, verá: `📄 Encontrados X arquivo(s) .mpp`
+- ✅ Se encontrar arquivos .mpp (pasta principal + subpastas), verá: `📄 Encontrados X arquivo(s) .mpp (pasta principal + subpastas)`
 - ✅ Se processar com sucesso, verá: `✅ Sincronização concluída`
 
 ### Segurança
@@ -279,7 +279,7 @@ Após configurar, execute a pipeline manualmente e verifique os logs:
    - Processa apenas arquivos modificados desde a última sincronização
 
 2. **Busca de Arquivos**:
-   - Se `USE_SHAREPOINT=true`: Busca arquivos `.mpp` no SharePoint
+   - Se `USE_SHAREPOINT=true`: Busca arquivos `.mpp` no SharePoint na **pasta principal** configurada em `SHAREPOINT_FOLDER_PATH` e em **todas as subpastas** (ex.: pastas por cliente). Arquivos na raiz da pasta e dentro de cada subpasta são considerados.
    - Caso contrário: Busca em diretório local configurado
 
 3. **Verificação de Histórico**:
@@ -542,7 +542,7 @@ ls backend/logs/*.html
 
 - `AZURE_DEVOPS_PAT`: Token de autenticação (obrigatório, secreto)
 - `USE_SHAREPOINT`: Habilita/desabilita SharePoint (true/false)
-- `SHAREPOINT_FOLDER_PATH`: Caminho da pasta no SharePoint
+- `SHAREPOINT_FOLDER_PATH`: Pasta principal no SharePoint (arquivos também são buscados nas subpastas)
 - `SHAREPOINT_CLIENT_SECRET`: Client Secret do App Registration (obrigatório, secreto)
 
 ### Horário de Execução
@@ -576,7 +576,7 @@ Para problemas ou dúvidas:
 
 ---
 
-**Última atualização**: 06/02/2026  
-**Versão**: 1.0.5
+**Última atualização**: 09/02/2026  
+**Versão**: 1.0.6
 **Desenvolvido por**: Marcelo Macedo  
 **E-mail**: [marcelo.macedo@qualiit.com.br](mailto:marcelo.macedo@qualiit.com.br)
