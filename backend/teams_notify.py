@@ -15,6 +15,7 @@ import json
 import logging
 import sys
 from pathlib import Path
+from urllib.parse import urlencode
 
 # Adiciona o diretório backend ao path
 backend_dir = Path(__file__).resolve().parent
@@ -55,6 +56,23 @@ def _escape_html(s: str) -> str:
     )
 
 
+def _teams_chat_deeplink(email: str) -> str:
+    """
+    Gera o deep link do Teams para abrir conversa 1:1 com o usuário.
+    Ver: https://learn.microsoft.com/en-us/microsoftteams/platform/concepts/build-and-test/deep-link-teams
+    """
+    if not (email or "").strip():
+        return ""
+    tenant_id = (
+        (getattr(settings, "GRAPH_TENANT_ID", "") or getattr(settings, "SHAREPOINT_TENANT_ID", "") or "")
+        .strip()
+    )
+    params = {"users": email.strip()}
+    if tenant_id:
+        params["tenantId"] = tenant_id
+    return "https://teams.microsoft.com/l/chat/0/0?" + urlencode(params)
+
+
 def _build_teams_message_html(
     features_data: list,
     work_item_link_fn,
@@ -62,7 +80,7 @@ def _build_teams_message_html(
 ) -> str:
     """
     Monta o corpo da mensagem no Teams em HTML: título com links (Feature | Microsoft Project),
-    tasks com link, motivo (status DevOps vs .mpp) e responsável com mailto.
+    tasks com link, motivo (status DevOps vs .mpp) e responsável com deep link para chat no Teams.
     Tasks duplicadas (mesmo task_id) são mostradas uma vez.
     """
     parts = [
@@ -111,7 +129,11 @@ def _build_teams_message_html(
             parts.append(f"<li>{task_part} — {_escape_html(motivo)}")
             if assignee_name:
                 if assignee_email:
-                    parts.append(f' Responsável: <a href="mailto:{_escape_html(assignee_email)}">{_escape_html(assignee_name)}</a>')
+                    chat_url = _teams_chat_deeplink(assignee_email)
+                    if chat_url:
+                        parts.append(f' Responsável: <a href="{_escape_html(chat_url)}">{_escape_html(assignee_name)}</a>')
+                    else:
+                        parts.append(f" Responsável: {_escape_html(assignee_name)}")
                 else:
                     parts.append(f" Responsável: {_escape_html(assignee_name)}")
             parts.append("</li>")
@@ -205,8 +227,9 @@ def _build_html_log(
                 parts.append(f"      <li><strong>Task {escaped(str(tid))}: {escaped(title)}</strong>")
             parts.append(f" <span class=\"task-motivo\">— {escaped(motivo)}</span>")
             if assignee_name:
-                if assignee_email:
-                    parts.append(f' <span class=\"task-assignee\">Responsável: <a href=\"mailto:{escaped(assignee_email)}\">{escaped(assignee_name)}</a></span>')
+                chat_url = _teams_chat_deeplink(assignee_email) if assignee_email else ""
+                if chat_url:
+                    parts.append(f' <span class=\"task-assignee\">Responsável: <a href=\"{escaped(chat_url)}\" target=\"_blank\" rel=\"noopener\">{escaped(assignee_name)}</a></span>')
                 else:
                     parts.append(f" <span class=\"task-assignee\">Responsável: {escaped(assignee_name)}</span>")
             parts.append("</li>")
