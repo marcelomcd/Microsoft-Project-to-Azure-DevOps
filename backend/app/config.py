@@ -138,6 +138,34 @@ class Settings(BaseSettings):
         default=False,
         description="Se True, usa SharePoint como fonte de arquivos. Se False, usa MPP_FILES_DIR"
     )
+    # Microsoft Graph / Teams (notificação PMO – tasks fechadas no DevOps)
+    TEAMS_NOTIFICATION_ENABLED: bool = Field(
+        default=False,
+        description="Se True, habilita envio de mensagem no Teams para PMO (tasks fechadas no DevOps, run 8:30)"
+    )
+    GRAPH_CLIENT_ID: str = Field(
+        default="",
+        description="Client ID do app no Entra ID para Microsoft Graph (pode ser o mesmo do SharePoint)"
+    )
+    GRAPH_CLIENT_SECRET: str = Field(
+        default="",
+        description="Client Secret do app para Graph (Chat.Create, ChatMessage.Send)"
+    )
+    GRAPH_TENANT_ID: str = Field(
+        default="",
+        description="Tenant ID do Entra ID (pode ser o mesmo do SharePoint)"
+    )
+    
+    @field_validator('TEAMS_NOTIFICATION_ENABLED', mode='before')
+    @classmethod
+    def parse_teams_notification_enabled(cls, v):
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            if v.startswith('$(') and v.endswith(')'):
+                return False
+            return v.strip().lower() in ('true', '1', 'yes', 'on')
+        return False
     
     @field_validator('USE_SHAREPOINT', mode='before')
     @classmethod

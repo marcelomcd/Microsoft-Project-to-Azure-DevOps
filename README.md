@@ -216,6 +216,22 @@ Configure as seguintes variáveis em **Edit** → **Variables**:
     - **Secreto**: ❌ Não
     - **Opções**: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
 
+#### Variáveis para Notificação Teams (opcional, pipeline 8:30)
+
+11. **`TEAMS_NOTIFICATION_ENABLED`**
+    - **Valor**: `true` para ativar envio de mensagem no Teams para PMOs (tasks fechadas no DevOps)
+    - **Tipo**: String (convertido para boolean)
+    - **Secreto**: ❌ Não
+
+12. **`GRAPH_CLIENT_ID`** / **`GRAPH_CLIENT_SECRET`** / **`GRAPH_TENANT_ID`**
+    - **Valor**: Mesmo app do SharePoint ou um app com permissões **Microsoft Graph** (Application): `Chat.Create`, `ChatMessage.Send`. Admin consent obrigatório.
+    - Se não preencher, o script usa `SHAREPOINT_CLIENT_ID`, `SHAREPOINT_CLIENT_SECRET`, `SHAREPOINT_TENANT_ID` (mesmo app deve ter as permissões Graph acima).
+
+13. **Pipeline de notificação (8:30)**  
+    - Crie uma **nova Pipeline** no Azure DevOps que use o arquivo **`azure-pipelines-teams-notify.yml`**.
+    - Em **Resources** (ou no YAML), defina a variável **`SYNC_PIPELINE_NAME`** com o **nome exato** da pipeline de sincronização (6:30).
+    - Agendamento: 8:30 BRT (11:30 UTC). A pipeline baixa o artefato `sync_logs` da última execução da pipeline de sync e executa `teams_notify.py`.
+
 #### Passo a Passo para Configurar Variáveis
 
 1. Acesse o Azure DevOps → **Pipelines** → Selecione sua pipeline
@@ -322,6 +338,10 @@ Após configurar, execute a pipeline manualmente e verifique os logs:
     - Salva timestamp da sincronização
     - Gera relatório em **HTML** (não mais .json ou .txt), nomeado pelo **ID da Feature** (ex: `16073.html`), em `backend/logs/`
     - O relatório inclui: referência no arquivo (User Stories/Tasks), já existiam na Feature, criados, atualizados, ignorados, erros (com motivo quando houver)
+
+11. **Notificação Teams (opcional, 8:30 BRT)**:
+    - Se houver Tasks que estão **Closed** no Azure DevOps mas não estavam no .mpp, a sync grava `backend/logs/closed_tasks_report.json`.
+    - Uma **segunda pipeline** (azure-pipelines-teams-notify.yml) agendada às **8:30 BRT** baixa esse relatório e envia **mensagem no Teams** (chat 1:1) para cada **PMO** (responsável pela Feature), listando as Tasks fechadas daquele Feature.
 
 ### Formato do Nome do Arquivo
 

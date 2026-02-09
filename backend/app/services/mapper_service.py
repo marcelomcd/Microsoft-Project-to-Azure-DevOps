@@ -47,7 +47,8 @@ class MapperService:
         iteration_path: Optional[str] = None,
         skip_duplicates: bool = True,
         parent_feature_id: Optional[int] = None,
-        update_existing: bool = False
+        update_existing: bool = False,
+        closed_tasks_collector: Optional[List[Dict[str, Any]]] = None,
     ) -> ConversionResult:
         """
         Converte dados parseados do MPP para Work Items no Azure DevOps.
@@ -139,7 +140,8 @@ class MapperService:
             skip_duplicates=skip_duplicates,
             update_existing=update_existing,
             item_map=item_map,
-            user_story_map=user_story_map
+            user_story_map=user_story_map,
+            closed_tasks_collector=closed_tasks_collector,
         )
         
         # Finaliza registro e adiciona ao resultado
@@ -302,7 +304,8 @@ class MapperService:
         skip_duplicates: bool,
         update_existing: bool,
         item_map: Dict[str, Optional[int]],
-        user_story_map: Dict[str, Optional[int]]
+        user_story_map: Dict[str, Optional[int]],
+        closed_tasks_collector: Optional[List[Dict[str, Any]]] = None,
     ):
         """
         Processa todas as Tasks do arquivo .mpp.
@@ -407,7 +410,9 @@ class MapperService:
                         correct_parent_id=parent_id if needs_reparent else None,
                         devops_state=self._map_status_to_devops_state(task.status),
                         start_date=task.start_date,
-                        target_date=task.finish_date
+                        target_date=task.finish_date,
+                        parent_feature_id=parent_feature_id,
+                        closed_tasks_collector=closed_tasks_collector,
                     )
                 else:
                     # Mesmo sem update_existing, re-vincula se necessário
@@ -980,7 +985,9 @@ class MapperService:
         correct_parent_id: Optional[int] = None,
         devops_state: Optional[str] = None,
         start_date: Optional[datetime] = None,
-        target_date: Optional[datetime] = None
+        target_date: Optional[datetime] = None,
+        parent_feature_id: Optional[int] = None,
+        closed_tasks_collector: Optional[List[Dict[str, Any]]] = None,
     ):
         """
         Atualiza uma Task existente no Azure DevOps.
@@ -1022,6 +1029,15 @@ class MapperService:
                         print(f"MapperService: Task '{title}' (ID: {existing_id}) está '{current_state}' no Azure DevOps. "
                               f"Status do MPP ('{task.status}' -> '{devops_state}') será ignorado para evitar alterar o status protegido.")
                         should_update_state = False
+                        # Registra para notificação Teams (PMO): Task fechada no DevOps mas não no MPP
+                        if closed_tasks_collector is not None and parent_feature_id is not None:
+                            closed_tasks_collector.append({
+                                "feature_id": parent_feature_id,
+                                "task_id": existing_id,
+                                "title": title,
+                                "mpp_status": task.status or "",
+                                "devops_state": current_state,
+                            })
                     elif devops_state and devops_state.lower() == current_state_lower:
                         # Se ambos têm o mesmo status protegido, pode atualizar (mantém o status)
                         should_update_state = True

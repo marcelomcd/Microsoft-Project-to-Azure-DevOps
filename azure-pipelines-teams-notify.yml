@@ -1,0 +1,95 @@
+# Pipeline de notificação Teams (8:30 BRT)
+#
+# Executa às 8:30h BRT; baixa o artefato sync_logs da última execução da pipeline de
+# sincronização (6:30) e envia mensagem no Teams para cada PMO com a lista de Tasks
+# que estão fechadas no Azure DevOps mas não estavam no .mpp.
+#
+# Pré-requisitos:
+# 1. Criar uma nova Pipeline no Azure DevOps que use este arquivo (azure-pipelines-teams-notify.yml).
+# 2. Em Resources → Pipelines, adicionar referência à pipeline de sincronização:
+#    - Pipeline: selecione a pipeline que roda às 6:30 (ex.: "Qualiit.AzureProjects.ProjectIntegration" ou o nome que você deu).
+# 3. Variáveis: TEAMS_NOTIFICATION_ENABLED=true, GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET, GRAPH_TENANT_ID
+#    (ou use as mesmas do SharePoint se for o mesmo app, e conceda permissões Chat.Create, ChatMessage.Send no Graph).
+
+trigger: none
+
+# Substitua 'NomeDaPipelineDeSync' pelo nome exato da pipeline que roda às 6:30,
+# como aparece em Pipelines do Azure DevOps (ex.: Qualiit.AzureProjects.ProjectIntegration).
+resources:
+  pipelines:
+  - pipeline: mpp_sync
+    source: NomeDaPipelineDeSync
+    project: $(System.TeamProject)
+
+schedules:
+  - cron: "30 11 * * *"  # 11:30 UTC = 8:30 BRT
+    displayName: Notificação Teams - 8:30h BRT
+    branches:
+      include:
+        - main
+        - master
+    always: true
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - name: PYTHON_VERSION
+    value: '3.10'
+
+steps:
+  - checkout: self
+    displayName: 'Checkout'
+    fetchDepth: 1
+
+  - task: UsePythonVersion@0
+    displayName: 'Configurar Python $(PYTHON_VERSION)'
+    inputs:
+      versionSpec: '$(PYTHON_VERSION)'
+      addToPath: true
+
+  - script: |
+      cd backend
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+    displayName: 'Instalar dependências Python'
+    workingDirectory: '$(System.DefaultWorkingDirectory)'
+
+  - task: DownloadPipelineArtifact@2
+    displayName: 'Baixar logs da última sincronização (6:30)'
+    inputs:
+      source: 'specific'
+      project: '$(System.TeamProject)'
+      pipeline: 'mpp_sync'
+      runVersion: 'latest'
+      artifactName: 'sync_logs'
+      targetPath: '$(Pipeline.Workspace)/sync_logs'
+    condition: succeeded()
+
+  - script: |
+      cd backend
+      export TEAMS_NOTIFICATION_ENABLED="$(TEAMS_NOTIFICATION_ENABLED)"
+      export GRAPH_CLIENT_ID="$(GRAPH_CLIENT_ID)"
+      export GRAPH_CLIENT_SECRET="$(GRAPH_CLIENT_SECRET)"
+      export GRAPH_TENANT_ID="$(GRAPH_TENANT_ID)"
+      export SHAREPOINT_CLIENT_ID="$(SHAREPOINT_CLIENT_ID)"
+      export SHAREPOINT_CLIENT_SECRET="$(SHAREPOINT_CLIENT_SECRET)"
+      export SHAREPOINT_TENANT_ID="$(SHAREPOINT_TENANT_ID)"
+      export AZURE_DEVOPS_ORG="$(AZURE_DEVOPS_ORG)"
+      REPORT="$(Pipeline.Workspace)/sync_logs/closed_tasks_report.json"
+      if [ -f "$REPORT" ]; then
+        python teams_notify.py --report "$REPORT"
+      else
+        echo "Arquivo closed_tasks_report.json não encontrado (nenhuma task fechada para notificar ou artefato indisponível)"
+      fi
+    displayName: 'Enviar notificações Teams para PMOs'
+    env:
+      TEAMS_NOTIFICATION_ENABLED: $(TEAMS_NOTIFICATION_ENABLED)
+      GRAPH_CLIENT_ID: $(GRAPH_CLIENT_ID)
+      GRAPH_CLIENT_SECRET: $(GRAPH_CLIENT_SECRET)
+      GRAPH_TENANT_ID: $(GRAPH_TENANT_ID)
+      SHAREPOINT_CLIENT_ID: $(SHAREPOINT_CLIENT_ID)
+      SHAREPOINT_CLIENT_SECRET: $(SHAREPOINT_CLIENT_SECRET)
+      SHAREPOINT_TENANT_ID: $(SHAREPOINT_TENANT_ID)
+      AZURE_DEVOPS_ORG: $(AZURE_DEVOPS_ORG)
+    condition: succeeded()

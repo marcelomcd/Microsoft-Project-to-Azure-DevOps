@@ -15,7 +15,7 @@ import sys
 import logging
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 # Adiciona o diretório backend ao path
 backend_dir = Path(__file__).parent
@@ -114,7 +114,8 @@ def process_files_sharepoint(
     files: List[Dict[str, Any]],
     history_service: SyncHistoryService,
     file_processor: FileProcessor,
-    sharepoint_service: SharePointFileService
+    sharepoint_service: SharePointFileService,
+    closed_tasks_collector: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Processa lista de arquivos .mpp do SharePoint.
@@ -197,7 +198,8 @@ def process_files_sharepoint(
                 file_path=temp_file,
                 original_filename=filename,  # Passa o nome original do SharePoint
                 update_existing=file_was_modified,  # Atualiza apenas se arquivo foi modificado
-                skip_duplicates=True  # Busca por nome exato antes de criar
+                skip_duplicates=True,  # Busca por nome exato antes de criar
+                closed_tasks_collector=closed_tasks_collector,
             )
             
             if process_result["success"]:
@@ -275,7 +277,8 @@ def process_files_sharepoint(
 def process_files_local(
     files: List[Path],
     history_service: SyncHistoryService,
-    file_processor: FileProcessor
+    file_processor: FileProcessor,
+    closed_tasks_collector: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Processa lista de arquivos .mpp do diretório local.
@@ -316,7 +319,8 @@ def process_files_local(
         process_result = file_processor.process_mpp_file(
             file_path=file_path,
             update_existing=True,
-            skip_duplicates=True
+            skip_duplicates=True,
+            closed_tasks_collector=closed_tasks_collector,
         )
         
         if process_result["success"]:
@@ -369,6 +373,81 @@ def process_files_local(
         logger.error(f"Erro ao salvar histórico: {e}")
     
     return results
+
+
+def _extract_assigned_to_email(fields: Dict[str, Any]) -> tuple:
+    """
+    Extrai email/UPN e nome do responsável (AssignedTo) da Feature.
+    Retorna (unique_name ou email, display_name).
+    """
+    assigned_to = fields.get("System.AssignedTo")
+    if not assigned_to:
+        return None, None
+    if isinstance(assigned_to, dict):
+        unique_name = assigned_to.get("uniqueName") or assigned_to.get("mail")
+        display_name = assigned_to.get("displayName", "")
+        return unique_name, display_name
+    # String (display name apenas)
+    return None, str(assigned_to) if assigned_to else None
+
+
+def write_closed_tasks_report(
+    closed_tasks_collector: List[Dict[str, Any]],
+    devops_client: AzureDevOpsClient,
+    logs_dir: Path,
+) -> Optional[Path]:
+    """
+    Agrupa tasks fechadas por Feature, obtém AssignedTo (PMO) de cada Feature
+    e grava closed_tasks_report.json para uso pela notificação Teams (8:30).
+    """
+    if not closed_tasks_collector:
+        return None
+    logs_dir = Path(logs_dir)
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    # Agrupa por feature_id
+    by_feature: Dict[int, List[Dict[str, Any]]] = {}
+    for item in closed_tasks_collector:
+        fid = item.get("feature_id")
+        if fid is None:
+            continue
+        by_feature.setdefault(fid, []).append(
+            {
+                "task_id": item.get("task_id"),
+                "title": item.get("title"),
+                "mpp_status": item.get("mpp_status"),
+                "devops_state": item.get("devops_state"),
+            }
+        )
+    features_report = []
+    for feature_id, tasks in by_feature.items():
+        assigned_to_unique = None
+        assigned_to_display = None
+        try:
+            wi = devops_client.get_work_item_by_id(feature_id, use_cache=False)
+            if wi and wi.fields:
+                assigned_to_unique, assigned_to_display = _extract_assigned_to_email(wi.fields)
+        except Exception as e:
+            logger.warning(f"Não foi possível obter responsável da Feature {feature_id}: {e}")
+        features_report.append({
+            "feature_id": feature_id,
+            "assigned_to_email": assigned_to_unique,
+            "assigned_to_display_name": assigned_to_display,
+            "closed_tasks": tasks,
+        })
+    report = {
+        "generated_at": datetime.now().isoformat(),
+        "features": features_report,
+    }
+    report_path = logs_dir / "closed_tasks_report.json"
+    try:
+        import json
+        with open(report_path, "w", encoding="utf-8") as f:
+            json.dump(report, f, indent=2, ensure_ascii=False)
+        logger.info(f"Relatório de tasks fechadas gravado: {report_path} ({len(features_report)} Feature(s))")
+        return report_path
+    except Exception as e:
+        logger.error(f"Erro ao gravar relatório de tasks fechadas: {e}")
+        return None
 
 
 def print_summary(results: Dict[str, Any]) -> None:
@@ -462,9 +541,14 @@ def main() -> int:
                 logger.warning("Nenhum arquivo .mpp encontrado no SharePoint")
                 return 0  # Não é erro se não há arquivos
             
-            # Processa arquivos do SharePoint
+            # Processa arquivos do SharePoint (coletor de tasks fechadas para notificação Teams)
+            closed_tasks_collector: List[Dict[str, Any]] = []
             logger.info(f"Iniciando processamento de {len(files)} arquivo(s) do SharePoint")
-            results = process_files_sharepoint(files, history_service, file_processor, sharepoint_service)
+            results = process_files_sharepoint(
+                files, history_service, file_processor, sharepoint_service,
+                closed_tasks_collector=closed_tasks_collector,
+            )
+            write_closed_tasks_report(closed_tasks_collector, devops_client, backend_dir / "logs")
         except Exception as e:
             logger.exception(f"Erro ao processar arquivos do SharePoint: {e}")
             return 1
@@ -502,9 +586,14 @@ def main() -> int:
             logger.warning("Nenhum arquivo .mpp encontrado no diretório especificado")
             return 0  # Não é erro se não há arquivos
         
-        # Processa arquivos locais
+        # Processa arquivos locais (coletor de tasks fechadas para notificação Teams)
+        closed_tasks_collector = []
         logger.info(f"Iniciando processamento de {len(mpp_files)} arquivo(s)")
-        results = process_files_local(mpp_files, history_service, file_processor)
+        results = process_files_local(
+            mpp_files, history_service, file_processor,
+            closed_tasks_collector=closed_tasks_collector,
+        )
+        write_closed_tasks_report(closed_tasks_collector, devops_client, backend_dir / "logs")
     
     # Imprime resumo
     print_summary(results)

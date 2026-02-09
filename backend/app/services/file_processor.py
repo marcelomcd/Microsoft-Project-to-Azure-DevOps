@@ -1,7 +1,7 @@
 """Serviço para processar arquivos .mpp (parse + conversão)"""
 import logging
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from app.services.mpp_parser import MPPParser
 from app.services.mapper_service import MapperService
@@ -38,7 +38,8 @@ class FileProcessor:
         parent_feature_id: Optional[int] = None,
         original_filename: Optional[str] = None,
         update_existing: bool = True,
-        skip_duplicates: bool = True
+        skip_duplicates: bool = True,
+        closed_tasks_collector: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """
         Processa um arquivo .mpp completo: parse + conversão para Azure DevOps.
@@ -118,7 +119,8 @@ class FileProcessor:
                 parsed_data=parsed_data,
                 skip_duplicates=skip_duplicates,
                 parent_feature_id=work_item_id,
-                update_existing=update_existing
+                update_existing=update_existing,
+                closed_tasks_collector=closed_tasks_collector,
             )
             
             result["conversion_result"] = conversion_result
