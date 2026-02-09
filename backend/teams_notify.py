@@ -42,6 +42,67 @@ def _sanitize_email_for_filename(email: str) -> str:
     return email.strip().replace("@", "_").replace(" ", "_")
 
 
+def _escape_html(s: str) -> str:
+    """Escapa texto para uso seguro em HTML."""
+    if not s:
+        return ""
+    return (
+        str(s)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def _build_teams_message_html(
+    features_data: list,
+    feature_link_fn,
+    intro_title: str = "Tasks mantidas como fechadas (não alteradas)",
+) -> str:
+    """
+    Monta o corpo da mensagem no Teams em HTML: quebras de linha, negrito e links clicáveis.
+    """
+    parts = [
+        "<p>Olá,</p>",
+        "<p>A sincronização MPP → Azure DevOps identificou Tasks que já estão <strong>fechadas</strong> no Azure DevOps, "
+        "mas que não estavam como concluídas no arquivo .mpp.</p>",
+        f"<p><strong>{_escape_html(intro_title)}</strong></p>",
+        "<p></p>",
+    ]
+    for feat in features_data:
+        fid = feat.get("feature_id")
+        link_url = feature_link_fn(fid)
+        parts.append(f"<p><strong>Feature {_escape_html(str(fid))}</strong></p>")
+        parts.append("<ul>")
+        for t in feat.get("closed_tasks") or []:
+            tid = t.get("task_id")
+            title = _escape_html((t.get("title") or "")[:80])
+            assignee = _escape_html(
+                (t.get("task_assigned_to_display_name") or t.get("task_assigned_to_email") or "").strip()
+            )
+            if assignee:
+                parts.append(f"<li>Task {tid}: {title} (Responsável: {assignee})</li>")
+            else:
+                parts.append(f"<li>Task {tid}: {title}</li>")
+        parts.append("</ul>")
+        parts.append(f'<p><a href="{_escape_html(link_url)}">Abrir Feature no Azure DevOps</a></p>')
+        file_links = feat.get("file_links") or []
+        if file_links:
+            parts.append("<p><strong>Arquivos .mpp no SharePoint (para alterar e refletir as conclusões):</strong></p>")
+            parts.append("<ul>")
+            for link in file_links:
+                name = _escape_html(link.get("file_name") or "(arquivo)")
+                url = (link.get("web_url") or "").strip()
+                if url:
+                    parts.append(f'<li><a href="{_escape_html(url)}">{name}</a></li>')
+                else:
+                    parts.append(f"<li>{name}</li>")
+            parts.append("</ul>")
+        parts.append("<p></p>")
+    return "".join(parts)
+
+
 def _build_html_log(
     email: str,
     display_name: str,
@@ -144,33 +205,101 @@ def _get_graph_token() -> str:
     return result["access_token"]
 
 
+# Escopos usados na autenticação delegada (devem bater com get_teams_refresh_token.py)
+_DELEGATED_SCOPES = ["User.Read", "Chat.Create", "ChatMessage.Send", "offline_access"]
+
+
+def _get_graph_token_delegated() -> str:
+    """Obtém token ao Graph usando refresh token do usuário (auth delegada)."""
+    import msal
+    
+    # Remove espaços e quebras de linha (evita token truncado ao colar no .env)
+    refresh_token = (getattr(settings, "TEAMS_REFRESH_TOKEN", "") or "").strip().replace("\r", "").replace("\n", "").replace(" ", "")
+    if not refresh_token:
+        raise ValueError("TEAMS_REFRESH_TOKEN está vazio; execute get_teams_refresh_token.py para obter um.")
+    if len(refresh_token) < 200:
+        logger.warning("TEAMS_REFRESH_TOKEN parece truncado (muito curto). Obtenha um novo com: python scripts/get_teams_refresh_token.py")
+    client_id = settings.GRAPH_CLIENT_ID or settings.SHAREPOINT_CLIENT_ID
+    client_secret = settings.GRAPH_CLIENT_SECRET or settings.SHAREPOINT_CLIENT_SECRET
+    tenant_id = settings.GRAPH_TENANT_ID or settings.SHAREPOINT_TENANT_ID
+    if not all([client_id, client_secret, tenant_id]):
+        raise ValueError(
+            "Configure GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET e GRAPH_TENANT_ID "
+            "(ou SHAREPOINT_*) para usar o refresh token."
+        )
+    authority = f"https://login.microsoftonline.com/{tenant_id}"
+    app = msal.ConfidentialClientApplication(
+        client_id,
+        authority=authority,
+        client_credential=client_secret,
+    )
+    # Escopos do Graph para criar chat e enviar mensagem (não incluir reservados: openid, profile, offline_access)
+    scopes = [
+        "https://graph.microsoft.com/User.Read",
+        "https://graph.microsoft.com/Chat.Create",
+        "https://graph.microsoft.com/ChatMessage.Send",
+    ]
+    result = app.acquire_token_by_refresh_token(refresh_token, scopes=scopes)
+    if "access_token" not in result:
+        raise RuntimeError(
+            f"Falha ao renovar token (refresh token expirado ou inválido): {result.get('error_description', result)}"
+        )
+    return result["access_token"]
+
+
+def _get_me_id(token: str, requests_module) -> str | None:
+    """Retorna o object ID do usuário atual (token delegado)."""
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    try:
+        resp = requests_module.get(f"{GRAPH_BASE}/me?$select=id", headers=headers, timeout=15)
+        if resp.status_code != 200:
+            return None
+        return (resp.json() or {}).get("id")
+    except Exception:
+        return None
+
+
 def _create_chat_and_send_message(
     token: str,
     user_email: str,
     body_text: str,
     requests_module,
+    initiator_user_id: str | None = None,
 ) -> bool:
     """
     Cria chat 1:1 com o usuário (por email/UPN) e envia a mensagem.
-    Nota: com permissão de aplicativo (app-only), alguns tenants retornam
-    "Creation of 'OneOnOne' chat requires 2 members". Nesse caso use
-    autenticação delegada (usuário) ou considere webhook/connector do Teams.
+    Com auth delegada (initiator_user_id preenchido), inclui os 2 membros exigidos pela API.
     Retorna True se enviou com sucesso.
     """
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
     }
-    # Criar chat 1:1 (doc: um membro; em app-only o tenant pode exigir 2)
-    create_body = {
-        "chatType": "oneOnOne",
-        "members": [
+    if initiator_user_id:
+        # Auth delegada: chat entre o usuário logado e o destinatário (2 membros)
+        members = [
+            {
+                "@odata.type": "#microsoft.graph.aadUserConversationMember",
+                "roles": ["owner"],
+                "user@odata.bind": f"https://graph.microsoft.com/v1.0/users('{initiator_user_id}')",
+            },
+            {
+                "@odata.type": "#microsoft.graph.aadUserConversationMember",
+                "roles": ["owner"],
+                "user@odata.bind": f"https://graph.microsoft.com/v1.0/users('{user_email}')",
+            },
+        ]
+    else:
+        members = [
             {
                 "@odata.type": "#microsoft.graph.aadUserConversationMember",
                 "roles": ["owner"],
                 "user@odata.bind": f"https://graph.microsoft.com/v1.0/users('{user_email}')",
             }
-        ],
+        ]
+    create_body = {
+        "chatType": "oneOnOne",
+        "members": members,
     }
     try:
         resp = requests_module.post(
@@ -187,10 +316,10 @@ def _create_chat_and_send_message(
         chat_id = resp.json().get("id")
         if not chat_id:
             return False
-        # Enviar mensagem no chat
+        # Enviar mensagem no chat (HTML para quebras de linha, negrito e links clicáveis)
         msg_body = {
             "body": {
-                "contentType": "text",
+                "contentType": "html",
                 "content": body_text,
             },
         }
@@ -215,7 +344,12 @@ def _create_chat_and_send_message(
 def run(report_path: Path) -> int:
     """
     Lê closed_tasks_report.json e envia uma mensagem no Teams para cada PMO
-    (assigned_to_email) com a lista de tasks fechadas da(s) Feature(s) dele.
+    responsável (Assigned To da Feature no Azure DevOps).
+
+    Cada destinatário é o assigned_to_email da Feature; um PMO pode receber
+    uma única mensagem com todas as Features (e tasks fechadas) das quais ele
+    é responsável. O relatório é gerado pela sync (pipeline_sync) com o
+    Assigned To real de cada Feature.
     """
     import requests
     
@@ -228,14 +362,14 @@ def run(report_path: Path) -> int:
     if not features:
         logger.info("Nenhuma task fechada para notificar.")
         return 0
-    # Agrupa por email (um PMO pode ter mais de uma Feature)
+    # Agrupa por responsável (Assigned To da Feature): cada PMO recebe uma mensagem com suas Features
     by_email: dict = {}
     for feat in features:
         email = (feat.get("assigned_to_email") or "").strip()
         display = (feat.get("assigned_to_display_name") or "").strip() or email
         if not email:
             logger.warning(
-                f"Feature {feat.get('feature_id')} sem email do responsável (assigned_to); ignorando."
+                f"Feature {feat.get('feature_id')} sem email do responsável (Assigned To); ignorando."
             )
             continue
         by_email.setdefault(email, {"display": display, "features": []})
@@ -243,11 +377,23 @@ def run(report_path: Path) -> int:
     if not by_email:
         logger.warning("Nenhum responsável com email no relatório.")
         return 0
+    refresh_token = (getattr(settings, "TEAMS_REFRESH_TOKEN", "") or "").strip()
+    use_delegated = bool(refresh_token)
+    if use_delegated:
+        logger.info("TEAMS_REFRESH_TOKEN definido: usando autenticação delegada (envio como seu usuário).")
+    else:
+        logger.info("TEAMS_REFRESH_TOKEN não definido: usando credenciais de aplicativo (pode gerar erro 'requires 2 members').")
     try:
-        token = _get_graph_token()
+        if use_delegated:
+            token = _get_graph_token_delegated()
+        else:
+            token = _get_graph_token()
     except Exception as e:
         logger.error(f"Não foi possível obter token Graph: {e}")
         return 1
+    initiator_user_id = _get_me_id(token, requests) if use_delegated else None
+    if use_delegated and not initiator_user_id:
+        logger.warning("Token delegado ativo mas não foi possível obter o ID do usuário (/me); o envio pode falhar com 'requires 2 members'.")
     sent = 0
     # Link da Feature: board de Features se configurado, senão _workitems/edit
     feature_board_base = (getattr(settings, "AZURE_DEVOPS_FEATURE_BOARD_BASE_URL", "") or "").strip().rstrip("/")
@@ -260,42 +406,7 @@ def run(report_path: Path) -> int:
         def feature_link(fid):
             return f"{base_url}/_workitems/edit/{fid}"
     for email, data in by_email.items():
-        lines = [
-            "Olá,",
-            "",
-            "A sincronização MPP → Azure DevOps identificou Tasks que já estão **fechadas** no Azure DevOps, "
-            "mas que não estavam como concluídas no arquivo .mpp.",
-            "",
-            "**Tasks mantidas como fechadas (não alteradas):**",
-            "",
-        ]
-        for feat in data["features"]:
-            fid = feat.get("feature_id")
-            lines.append(f"**Feature {fid}**")
-            for t in feat.get("closed_tasks") or []:
-                tid = t.get("task_id")
-                title = (t.get("title") or "")[:80]
-                assignee = (t.get("task_assigned_to_display_name") or t.get("task_assigned_to_email") or "").strip()
-                if assignee:
-                    lines.append(f"  • Task {tid}: {title} (Responsável: {assignee})")
-                else:
-                    lines.append(f"  • Task {tid}: {title}")
-            lines.append(f"  Link Azure DevOps: {feature_link(fid)}")
-            # Links dos arquivos .mpp no SharePoint (para alterar diretamente)
-            file_links = feat.get("file_links") or []
-            if file_links:
-                lines.append("")
-                lines.append("**Arquivos .mpp no SharePoint (para alterar e refletir as conclusões):**")
-                for link in file_links:
-                    name = link.get("file_name") or "(arquivo)"
-                    url = (link.get("web_url") or "").strip()
-                    if url:
-                        lines.append(f"  • {name}")
-                        lines.append(f"    {url}")
-                    else:
-                        lines.append(f"  • {name}")
-            lines.append("")
-        body_text = "\n".join(lines).strip()
+        body_content = _build_teams_message_html(data["features"], feature_link)
         # Log HTML com o corpo completo da mensagem enviada ao PMO (nome do arquivo = email sanitizado)
         log_dir = report_path.parent / TEAMS_NOTIFY_LOG_SUBDIR
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -312,53 +423,67 @@ def run(report_path: Path) -> int:
             logger.info(f"Log HTML gravado: {html_path}")
         except Exception as e:
             logger.warning(f"Não foi possível gravar log HTML para {email}: {e}")
-        if _create_chat_and_send_message(token, email, body_text, requests):
+        if _create_chat_and_send_message(token, email, body_content, requests, initiator_user_id):
             sent += 1
     # E-mail de verificação: envia uma mensagem consolidada com tudo que foi enviado aos PMOs
     verification_email = (getattr(settings, "TEAMS_VERIFICATION_EMAIL", "") or "").strip()
     if verification_email and verification_email not in by_email:
-        verification_lines = [
-            "**Relatório de verificação – Conteúdo enviado aos PMOs**",
-            "",
-            "Resumo do que foi enviado a cada responsável (Features/Tasks fechadas no DevOps que não estavam no .mpp):",
-            "",
+        # Monta HTML de verificação: lista por PMO com links
+        verification_parts = [
+            "<p><strong>Relatório de verificação – Conteúdo enviado aos PMOs</strong></p>",
+            "<p>Resumo do que foi enviado a cada responsável (Features/Tasks fechadas no DevOps que não estavam no .mpp):</p>",
+            "<p></p>",
         ]
         for email, data in by_email.items():
-            verification_lines.append(f"--- Enviado para: {data['display']} ({email}) ---")
+            verification_parts.append(
+                f"<p><strong>— Enviado para: {_escape_html(data['display'])} ({_escape_html(email)})</strong></p>"
+            )
             for feat in data["features"]:
                 fid = feat.get("feature_id")
-                verification_lines.append(f"Feature {fid}")
+                link_url = feature_link(fid)
+                verification_parts.append(f'<p>Feature {fid} – <a href="{_escape_html(link_url)}">Abrir no Azure DevOps</a></p>')
+                verification_parts.append("<ul>")
                 for t in feat.get("closed_tasks") or []:
                     tid = t.get("task_id")
-                    title = (t.get("title") or "")[:80]
-                    assignee = (t.get("task_assigned_to_display_name") or t.get("task_assigned_to_email") or "").strip()
+                    title = _escape_html((t.get("title") or "")[:80])
+                    assignee = _escape_html(
+                        (t.get("task_assigned_to_display_name") or t.get("task_assigned_to_email") or "").strip()
+                    )
                     if assignee:
-                        verification_lines.append(f"  • Task {tid}: {title} (Responsável: {assignee})")
+                        verification_parts.append(f"<li>Task {tid}: {title} (Responsável: {assignee})</li>")
                     else:
-                        verification_lines.append(f"  • Task {tid}: {title}")
-                verification_lines.append(f"  Link: {feature_link(fid)}")
+                        verification_parts.append(f"<li>Task {tid}: {title}</li>")
+                verification_parts.append("</ul>")
                 for link in feat.get("file_links") or []:
-                    verification_lines.append(f"  .mpp: {link.get('file_name') or '(arquivo)'}")
-            verification_lines.append("")
-        verification_body = "\n".join(verification_lines).strip()
-        if _create_chat_and_send_message(token, verification_email, verification_body, requests):
+                    name = _escape_html(link.get("file_name") or "(arquivo)")
+                    url = (link.get("web_url") or "").strip()
+                    if url:
+                        verification_parts.append(f'<p>Arquivo .mpp: <a href="{_escape_html(url)}">{name}</a></p>')
+                    else:
+                        verification_parts.append(f"<p>Arquivo .mpp: {name}</p>")
+            verification_parts.append("<p></p>")
+        verification_body = "".join(verification_parts)
+        if _create_chat_and_send_message(token, verification_email, verification_body, requests, initiator_user_id):
             logger.info(f"Mensagem de verificação enviada para {verification_email}")
     elif verification_email and verification_email in by_email:
         # Já recebeu a mensagem como PMO; opcionalmente enviar resumo dos outros
         others = {e: d for e, d in by_email.items() if e != verification_email}
         if others:
-            verification_lines = [
-                "**Relatório de verificação – Conteúdo enviado aos outros PMOs**",
-                "",
+            verification_parts = [
+                "<p><strong>Relatório de verificação – Conteúdo enviado aos outros PMOs</strong></p>",
+                "<p></p>",
             ]
             for email, data in others.items():
-                verification_lines.append(f"--- Enviado para: {data['display']} ({email}) ---")
+                verification_parts.append(
+                    f"<p><strong>— Enviado para: {_escape_html(data['display'])} ({_escape_html(email)})</strong></p>"
+                )
                 for feat in data["features"]:
                     fid = feat.get("feature_id")
-                    verification_lines.append(f"Feature {fid}: {len(feat.get('closed_tasks') or [])} task(s)")
-                verification_lines.append("")
-            verification_body = "\n".join(verification_lines).strip()
-            if _create_chat_and_send_message(token, verification_email, verification_body, requests):
+                    n = len(feat.get("closed_tasks") or [])
+                    verification_parts.append(f"<p>Feature {fid}: {n} task(s)</p>")
+                verification_parts.append("<p></p>")
+            verification_body = "".join(verification_parts)
+            if _create_chat_and_send_message(token, verification_email, verification_body, requests, initiator_user_id):
                 logger.info(f"Resumo de verificação (outros PMOs) enviado para {verification_email}")
     logger.info(f"Notificações enviadas: {sent}/{len(by_email)}")
     return 0

@@ -1,15 +1,20 @@
 """Configurações do sistema usando Pydantic Settings para validação e segurança."""
 import os
+from pathlib import Path
 from typing import List
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# .env na pasta backend (app/config.py -> app -> backend)
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+_ENV_FILE = _BACKEND_DIR / ".env"
 
 
 class Settings(BaseSettings):
     """Configurações da aplicação com validação automática."""
     
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_ENV_FILE if _ENV_FILE.exists() else ".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",
@@ -164,6 +169,13 @@ class Settings(BaseSettings):
     TEAMS_VERIFICATION_EMAIL: str = Field(
         default="",
         description="Se preenchido, recebe uma mensagem no Teams com o resumo de tudo enviado aos PMOs (ex: marcelo.macedo@qualiit.com.br)"
+    )
+    # Refresh token do usuário para envio no Teams em nome do usuário (auth delegada).
+    # Quando preenchido, as mensagens são enviadas a partir da sua conta; evita o erro "requires 2 members".
+    # Obtenha com: python scripts/get_teams_refresh_token.py
+    TEAMS_REFRESH_TOKEN: str = Field(
+        default="",
+        description="Refresh token (delegado) para enviar mensagens no Teams como usuário; obter com get_teams_refresh_token.py"
     )
 
     @field_validator('TEAMS_NOTIFICATION_ENABLED', mode='before')

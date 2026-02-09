@@ -2,17 +2,21 @@
 """
 Script de teste local para notificação Teams.
 
-Gera um closed_tasks_report.json de exemplo e executa teams_notify.py para
-enviar uma mensagem de teste ao e-mail informado (por padrão marcelo.macedo@qualiit.com.br).
-Use para verificar se a mensagem chega no Teams antes de confiar na pipeline.
+Gera um closed_tasks_report.json de EXEMPLO (Feature 99999, tasks fictícias) e
+executa teams_notify.py para enviar uma mensagem de teste a um e-mail que você
+informar. Use apenas para validar se o envio no Teams está funcionando.
+
+No uso real (pipeline às 8h), o relatório é gerado pela sync e cada mensagem
+é enviada ao responsável (Assigned To) de cada Feature no Azure DevOps — um
+PMO por mensagem, com apenas as Features e tasks fechadas dele.
 
 Requisitos:
-  - TEAMS_NOTIFICATION_ENABLED=true no .env (ou variável de ambiente)
-  - GRAPH_* ou SHAREPOINT_* configurados no .env (app com Chat.Create + Chat.ReadWrite.All e consentimento)
+  - TEAMS_NOTIFICATION_ENABLED=true e TEAMS_REFRESH_TOKEN no .env
+  - GRAPH_* ou SHAREPOINT_* configurados no .env
 
-Uso (a partir da raiz do repo ou de backend/):
+Uso (a partir da pasta backend/):
   python scripts/test_teams_notify_local.py
-  python scripts/test_teams_notify_local.py --email daniel.bragion@qualiit.com.br
+  python scripts/test_teams_notify_local.py --email outro@qualiit.com.br
 """
 import argparse
 import json
@@ -24,9 +28,21 @@ from pathlib import Path
 backend_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(backend_dir))
 
+# Carrega o .env da pasta backend ANTES de importar app/teams_notify (TEAMS_REFRESH_TOKEN etc.)
+_env_file = backend_dir / ".env"
+if _env_file.exists():
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(_env_file, override=True)
+    except ImportError:
+        pass
+else:
+    print(f"Aviso: arquivo .env não encontrado em {_env_file}")
+
 # Relatório de teste será gravado em backend/logs/teams_notify_test/
 TEST_REPORT_DIR = backend_dir / "logs" / "teams_notify_test"
-DEFAULT_TEST_EMAIL = "marcelo.macedo@qualiit.com.br"
+# Destinatário padrão do teste (apenas para validação local; no uso real = Assigned To de cada Feature)
+DEFAULT_TEST_EMAIL = "jessica.barbosa@qualiit.com.br"
 
 
 def build_test_report(recipient_email: str, recipient_display_name: str) -> Path:
@@ -85,9 +101,13 @@ def main() -> int:
     email = (args.email or "").strip() or DEFAULT_TEST_EMAIL
     name = (args.name or "").strip() or email
 
+    import os
+    has_refresh = bool((os.environ.get("TEAMS_REFRESH_TOKEN") or "").strip())
     print("Gerando relatório de teste...")
     report_path = build_test_report(email, name)
     print(f"Destinatário da mensagem de teste: {name} <{email}>")
+    if not has_refresh:
+        print("Aviso: TEAMS_REFRESH_TOKEN não está no ambiente. Adicione no backend/.env (uma linha, sem aspas).")
     print("Executando teams_notify.py (requer TEAMS_NOTIFICATION_ENABLED=true e credenciais Graph no .env)...")
     print()
 

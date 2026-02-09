@@ -1033,6 +1033,15 @@ class MapperService:
                         should_update_state = False
                         # Registra para notificação Teams (PMO): Task fechada no DevOps mas não no MPP
                         if closed_tasks_collector is not None and parent_feature_id is not None:
+                            task_assigned_to_email = None
+                            task_assigned_to_display_name = None
+                            if current_task and current_task.fields:
+                                at = current_task.fields.get("System.AssignedTo")
+                                if at and isinstance(at, dict):
+                                    task_assigned_to_email = at.get("uniqueName") or at.get("mail")
+                                    task_assigned_to_display_name = at.get("displayName", "")
+                                elif at:
+                                    task_assigned_to_display_name = str(at)
                             closed_tasks_collector.append({
                                 "feature_id": parent_feature_id,
                                 "task_id": existing_id,
@@ -1040,6 +1049,8 @@ class MapperService:
                                 "mpp_status": task.status or "",
                                 "devops_state": current_state,
                                 "mpp_file_name": mpp_file_name or "",
+                                "task_assigned_to_email": task_assigned_to_email or "",
+                                "task_assigned_to_display_name": task_assigned_to_display_name or "",
                             })
                     elif devops_state and devops_state.lower() == current_state_lower:
                         # Se ambos têm o mesmo status protegido, pode atualizar (mantém o status)

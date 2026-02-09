@@ -42,6 +42,7 @@ backend/test_sharepoint_local.bat
 # Logs (manter diretório, ignorar arquivos)
 backend/logs/*.json
 backend/logs/*.txt
+backend/logs/teams_notify_test/
 *.log
 *.log.*
 

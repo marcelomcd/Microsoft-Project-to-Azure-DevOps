@@ -10,6 +10,7 @@
 #    - Pipeline: selecione a pipeline que roda às 6:30 (ex.: "Qualiit.AzureProjects.ProjectIntegration" ou o nome que você deu).
 # 3. Variáveis: TEAMS_NOTIFICATION_ENABLED=true, GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET, GRAPH_TENANT_ID
 #    (ou use as mesmas do SharePoint se for o mesmo app, e conceda permissões Chat.Create, ChatMessage.Send no Graph).
+#    Opcional: TEAMS_REFRESH_TOKEN (variável secreta) para enviar como usuário e evitar erro "requires 2 members".
 
 trigger: none
 
@@ -77,6 +78,8 @@ steps:
       export SHAREPOINT_TENANT_ID="$(SHAREPOINT_TENANT_ID)"
       export AZURE_DEVOPS_ORG="$(AZURE_DEVOPS_ORG)"
       export TEAMS_VERIFICATION_EMAIL="$(TEAMS_VERIFICATION_EMAIL)"
+      export TEAMS_REFRESH_TOKEN="$(TEAMS_REFRESH_TOKEN)"
+      export AZURE_DEVOPS_FEATURE_BOARD_BASE_URL="$(AZURE_DEVOPS_FEATURE_BOARD_BASE_URL)"
       REPORT="$(Pipeline.Workspace)/sync_logs/closed_tasks_report.json"
       if [ -f "$REPORT" ]; then
         python teams_notify.py --report "$REPORT"
@@ -94,4 +97,6 @@ steps:
       SHAREPOINT_TENANT_ID: $(SHAREPOINT_TENANT_ID)
       AZURE_DEVOPS_ORG: $(AZURE_DEVOPS_ORG)
       TEAMS_VERIFICATION_EMAIL: $(TEAMS_VERIFICATION_EMAIL)
+      TEAMS_REFRESH_TOKEN: $(TEAMS_REFRESH_TOKEN)
+      AZURE_DEVOPS_FEATURE_BOARD_BASE_URL: $(AZURE_DEVOPS_FEATURE_BOARD_BASE_URL)
     condition: succeeded()

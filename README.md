@@ -230,6 +230,12 @@ Configure as seguintes variáveis em **Edit** → **Variables**:
     - **Tipo**: String (convertido para boolean)
     - **Secreto**: ❌ Não
 
+11.2. **`TEAMS_REFRESH_TOKEN`** (opcional, recomendado para envio no Teams)
+    - **Valor**: Refresh token do **seu usuário** para enviar mensagens no Teams em seu nome (auth delegada). Evita o erro *"Creation of 'OneOnOne' chat requires 2 members"* que ocorre com credenciais só de aplicativo.
+    - **Como obter**: No app no **Microsoft Entra ID** → Autenticação → adicione um redirect URI **Web**: `http://localhost:8400`. Depois execute **uma vez** `python scripts/get_teams_refresh_token.py` na pasta `backend` (com GRAPH_* ou SHAREPOINT_* no .env). O navegador abrirá para login; copie o valor exibido para o .env e, na pipeline, para uma variável secreta.
+    - **App no Entra ID**: permissões delegadas **User.Read**, **Chat.Create** (e consentimento).
+    - **Secreto**: ✅ Sim (não versionar; use variável secreta na pipeline).
+
 12. **`GRAPH_CLIENT_ID`** / **`GRAPH_CLIENT_SECRET`** / **`GRAPH_TENANT_ID`**
     - **Valor**: Mesmo app do SharePoint ou um app com permissões **Microsoft Graph** (Application): `Chat.Create`, `ChatMessage.Send`. Admin consent obrigatório.
     - Se não preencher, o script usa `SHAREPOINT_CLIENT_ID`, `SHAREPOINT_CLIENT_SECRET`, `SHAREPOINT_TENANT_ID` (mesmo app deve ter as permissões Graph acima).
@@ -245,11 +251,11 @@ Configure as seguintes variáveis em **Edit** → **Variables**:
     - Agendamento: 8h BRT (11:00 UTC). A pipeline baixa o artefato `sync_logs` da última execução da pipeline de sync e executa `teams_notify.py`.
 
 #### Teste local da notificação Teams
-- Para verificar se a mensagem chega no Teams antes de depender da pipeline: na pasta **`backend`**, com **`TEAMS_NOTIFICATION_ENABLED=true`** e credenciais Graph no `.env`, execute:
-  `python scripts/test_teams_notify_local.py`
-- Por padrão envia uma mensagem de **teste** para `marcelo.macedo@qualiit.com.br`. Para outro destinatário: `python scripts/test_teams_notify_local.py --email outro@qualiit.com.br`.
-- O script gera um `closed_tasks_report.json` de exemplo em `backend/logs/teams_notify_test/` e chama `teams_notify.py`; assim você confere no Teams se o envio está funcionando.
-- **Nota:** Se aparecer erro *"Creation of 'OneOnOne' chat requires 2 members"* ao usar **credenciais de aplicativo** (client_id/secret), o tenant pode exigir autenticação **delegada** (usuário) para criar o chat 1:1; nesse caso configure o envio via pipeline com identidade de usuário ou avalie uso de webhook/connector do Teams.
+- **No uso real (pipeline 8h):** cada mensagem é enviada ao **responsável (Assigned To) de cada Feature** no Azure DevOps — um PMO por mensagem, com apenas as Features e tasks fechadas dele. O relatório `closed_tasks_report.json` é gerado pela sync com esses dados.
+- **Teste local:** o script `test_teams_notify_local.py` gera um relatório de **exemplo** (Feature fictícia) e envia para um e-mail que você informar, **apenas para validar** se o envio no Teams está funcionando. Por padrão usa `jessica.barbosa@qualiit.com.br`; para outro destinatário: `python scripts/test_teams_notify_local.py --email outro@qualiit.com.br`.
+- **Recomendado (envio como seu usuário):** Na pasta **`backend`**, execute **uma vez** `python scripts/get_teams_refresh_token.py`, faça login no navegador e copie o **TEAMS_REFRESH_TOKEN** para o `.env`. Depois defina **TEAMS_NOTIFICATION_ENABLED=true** e rode `python scripts/test_teams_notify_local.py`. As mensagens serão enviadas no Teams a partir da sua conta.
+- Sem refresh token: com só client_id/secret, alguns tenants retornam *"Creation of 'OneOnOne' chat requires 2 members"*; use o refresh token (acima) para evitar isso.
+- O script de teste grava o relatório de exemplo em `backend/logs/teams_notify_test/closed_tasks_report.json` e chama `teams_notify.py`; assim você confere no Teams se o envio está funcionando.
 
 #### Passo a Passo para Configurar Variáveis
 
@@ -359,8 +365,8 @@ Após configurar, execute a pipeline manualmente e verifique os logs:
     - O relatório inclui: referência no arquivo (User Stories/Tasks), já existiam na Feature, criados, atualizados, ignorados, erros (com motivo quando houver)
 
 11. **Notificação Teams (opcional, 8h BRT)**:
-    - Se houver Tasks que estão **Closed** no Azure DevOps mas não estavam no .mpp, a sync grava `backend/logs/closed_tasks_report.json`.
-    - Uma **segunda pipeline** (azure-pipelines-teams-notify.yml) agendada às **8h BRT** baixa esse relatório e envia **mensagem no Teams** (chat 1:1) para cada **PMO** (responsável pela Feature), listando as Tasks fechadas daquele Feature e os **links dos arquivos .mpp no SharePoint** para o PMO abrir e alterar diretamente (já que editar o .mpp no SharePoint é a boa prática; a notificação facilita o acesso).
+    - Se houver Tasks que estão **Closed** no Azure DevOps mas não estavam no .mpp, a sync grava `backend/logs/closed_tasks_report.json` com o **Assigned To (PMO) de cada Feature**.
+    - Uma **segunda pipeline** (azure-pipelines-teams-notify.yml) agendada às **8h BRT** baixa esse relatório e envia **mensagem no Teams** (chat 1:1) **para o responsável de cada Feature** (Assigned To no Azure DevOps): cada PMO recebe uma mensagem apenas com as Features e tasks fechadas das quais ele é responsável, mais os **links dos arquivos .mpp no SharePoint** para abrir e alterar (editar o .mpp no SharePoint é a boa prática).
     - Para cada PMO é gerado também um **log em HTML** com o corpo completo da mensagem enviada, em `logs/teams_notify/<email>.html` (ex: `jessica.barbosa_qualiit.com.br.html`), de forma estruturada e fácil de ler.
 
 ### Formato do Nome do Arquivo

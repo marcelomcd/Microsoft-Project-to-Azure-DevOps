@@ -421,6 +421,8 @@ def write_closed_tasks_report(
             "title": item.get("title"),
             "mpp_status": item.get("mpp_status"),
             "devops_state": item.get("devops_state"),
+            "task_assigned_to_email": item.get("task_assigned_to_email") or "",
+            "task_assigned_to_display_name": item.get("task_assigned_to_display_name") or "",
         })
         fname = (item.get("mpp_file_name") or "").strip()
         if fname:
