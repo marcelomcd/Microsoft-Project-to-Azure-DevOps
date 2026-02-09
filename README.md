@@ -607,8 +607,19 @@ Para problemas ou dúvidas:
 
 **Última atualização**: 09/02/2026  
 **Versão**: 1.1.0  
-- *1.1.0* (09/02/2026): Notificação Teams (chat 1:1 por PMO às 8h BRT), links dos .mpp no SharePoint na mensagem, link da Feature no board do Azure DevOps.  
-- *1.0.6*: Sync pasta principal + subpastas SharePoint, relatórios HTML por Feature.
+
+### Histórico de versões
+
+| Versão | Data | Alterações |
+|--------|------|------------|
+| **1.1.0** | 09/02/2026 | Notificação Teams: mensagem no Teams (chat 1:1) para cada PMO às 8h BRT com tasks fechadas no DevOps que não estavam no .mpp; links dos arquivos .mpp no SharePoint na mensagem; link da Feature no board do Azure DevOps (formato `.../Features?workitem=ID`). Pipeline opcional 8h (azure-pipelines-teams-notify.yml). |
+| **1.0.6** | 09/02/2026 | Sync considera pasta principal e subpastas no SharePoint (um nível, por cliente). Chave de histórico por pasta. README com nova lógica e variável SHAREPOINT_FOLDER_PATH. Regra de commit/push para Azure DevOps. Pasta .cursor no .gitignore. |
+| **1.0.5** | 06/02/2026 | Relatório de sync: Task em amarelo, User Story em azul; recurso "Cliente" apenas no template. Ajustes no resource mapper (Vladimir Davelli). |
+| **1.0.4** | 06/02/2026 | Logs HTML: dados de Task (recurso, datas, horas), cores PT-BR e formatação. Atualizações SharePoint e guia MPP. Requirements e documentação. |
+| **1.0.3** | 06/02/2026 | Logs apenas em HTML nomeados pelo ID da Feature (ex: `16073.html`). GITHUB_ACCESS_TOKEN para Python na pipeline. Pipeline ajustada para Python 3.10 (pré-instalado no agente). Remoção de sync_report_v2.html. |
+| **1.0.2** | 15/01–19/01/2026 | Mapeamento de Status do MPP para State do Azure DevOps. Proteção de Tasks Closed/Resolved/Removed (não reabertar). Tarefas com recurso "Cliente" sem responsável atribuído. Resource mapper (Tiago Oliveira e outros). Pipeline diária às 6:30 BRT. |
+| **1.0.1** | 17/12/2025 | Conversão de horas do campo "Trabalho" do MPP para "Original Estimate" nas Tasks (segundos → horas). Pipeline agendada diariamente às 6:30 BRT. Documentação de horários e versão. |
+| **1.0.0** | 12/2025 | Versão inicial: sincronização de arquivos .mpp (SharePoint ou local) com Azure DevOps; parsing via MPXJ (Java); criação/atualização de User Stories e Tasks; extração de Feature ID do nome do arquivo; busca por nome exato; histórico de sincronização; atualização condicional por timestamp; integração SharePoint (OAuth2) e pipeline Azure DevOps. |
 
 **Desenvolvido por**: Marcelo Macedo  
 **E-mail**: [marcelo.macedo@qualiit.com.br](mailto:marcelo.macedo@qualiit.com.br)
