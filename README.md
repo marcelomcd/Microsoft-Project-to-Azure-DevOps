@@ -283,24 +283,48 @@ Para **replicar o seu `.env` local** nas pipelines do Azure DevOps (sem commitar
 
 #### App Registration no Microsoft Entra ID
 
-Para configurar o acesso ao SharePoint, você precisa criar um App Registration:
+Para configurar o acesso ao SharePoint (e ao Teams, se for usar notificações), crie um App Registration e configure as permissões de API.
+
+**Caminho no portal Azure**
+
+```
+Microsoft Azure → Microsoft Entra ID → App registrations → [Seu aplicativo] → Permissões de APIs
+```
+
+- **Portal:** https://portal.azure.com  
+- No menu lateral: **Microsoft Entra ID** (antigo Azure Active Directory) → **App registrations** → selecione o app (ou crie um com **+ New registration**).  
+- No app: no menu **Gerenciar**, clique em **Permissões de APIs** (API permissions).
+
+**Criação do app (resumo)**
 
 1. Acesse o Azure Portal: https://portal.azure.com
-2. Vá em **Microsoft Entra ID** → **App registrations**
-3. Clique em **+ New registration**
-4. Configure:
-   - **Name**: Nome do app (ex: "MPP Sync SharePoint")
+2. **Microsoft Entra ID** → **App registrations** → **+ New registration**
+3. Configure:
+   - **Name**: Nome do app (ex: "MPP Sync SharePoint" ou "SharePointVerify")
    - **Supported account types**: Accounts in this organizational directory only
-   - **Redirect URI**: Deixe vazio (não necessário para app-only)
-5. Após criar, anote o **Application (client) ID** → use em `SHAREPOINT_CLIENT_ID`
-6. Anote o **Directory (tenant) ID** → use em `SHAREPOINT_TENANT_ID`
-7. Vá em **Certificates & secrets** → **+ New client secret**
-8. **Copie o VALOR do secret imediatamente** (não o ID) → use em `SHAREPOINT_CLIENT_SECRET`
-9. Vá em **API permissions** → **+ Add a permission** → **Microsoft Graph** → **Application permissions**
-10. Adicione as permissões:
-    - `Sites.Read.All`
-    - `Files.Read.All`
-11. Clique em **Grant admin consent** para conceder as permissões
+   - **Redirect URI**: Para app-only, deixe vazio. Para obter o refresh token do Teams, adicione depois um redirect **Web** (ex.: `http://localhost:8400`) em **Authentication**.
+4. Após criar, anote o **Application (client) ID** → use em `SHAREPOINT_CLIENT_ID` / `GRAPH_CLIENT_ID`
+5. Anote o **Directory (tenant) ID** → use em `SHAREPOINT_TENANT_ID` / `GRAPH_TENANT_ID`
+6. **Certificates & secrets** → **+ New client secret** → copie o **VALOR** (não o ID) → use em `SHAREPOINT_CLIENT_SECRET` / `GRAPH_CLIENT_SECRET`
+
+**Permissões de APIs (Microsoft Graph)**
+
+Em **Permissões de APIs** → **+ Adicionar uma permissão** → **Microsoft Graph**. Adicione as permissões abaixo conforme o uso (SharePoint só sync, ou sync + notificação Teams).
+
+| API / Nome da permissão | Tipo        | Descrição                                      | Consentimento admin | Uso                    |
+|-------------------------|------------|------------------------------------------------|---------------------|------------------------|
+| **Sites.Read.All**      | Aplicativo | Read items in all site collections             | Sim                 | SharePoint (sync)      |
+| **Files.Read.All**      | Aplicativo | Read files in all site collections             | Sim                 | SharePoint (sync)      |
+| **Sites.ReadWrite.All** | Aplicativo | Read and write items in all site collections  | Sim                 | SharePoint (opcional)  |
+| **Chat.Create**         | Aplicativo | Create chats                                  | Sim                 | Notificação Teams      |
+| **Chat.ReadWrite.All**  | Aplicativo | Read and write all chat messages               | Sim                 | Notificação Teams      |
+| **ChatMessage.Send**    | Delegado   | Send user chat messages                        | Não                 | Notificação Teams (com refresh token) |
+| **User.Read**           | Delegado   | Sign in and read user profile                  | Não                 | Notificação Teams (login para refresh token) |
+
+- **Só sincronização MPP (SharePoint):** use pelo menos `Sites.Read.All` e `Files.Read.All` (tipo **Aplicativo**).
+- **Com notificação Teams:** adicione também `Chat.Create`, `Chat.ReadWrite.All` (Aplicativo) e, para envio em nome do usuário (recomendado), `ChatMessage.Send` e `User.Read` (Delegado). Para refresh token, configure um **Redirect URI** em **Authentication** (ex.: `http://localhost:8400`).
+
+Depois de adicionar as permissões, clique em **Conceder consentimento do administrador para [seu tenant]** para que o status fique "Concedido para ...".
 
 #### Verificação da Configuração
 
