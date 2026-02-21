@@ -1,0 +1,194 @@
+# EditorConfig — https://editorconfig.org
+# Garante consistência de formatação independente do editor, OS ou desenvolvedor.
+# Suportado nativamente pelo Cursor, VS Code, JetBrains, Vim, Neovim, Emacs e outros.
+#
+# Propriedades suportadas pela spec:
+#   charset              → encoding do arquivo
+#   end_of_line          → lf | crlf | cr
+#   indent_style         → space | tab
+#   indent_size          → número de espaços (ou "tab" para usar tab_width)
+#   tab_width            → largura visual do tab (default = indent_size)
+#   trim_trailing_whitespace → remove espaços no fim de cada linha
+#   insert_final_newline → garante newline no final do arquivo
+#   max_line_length      → limite de caracteres por linha (informativo p/ alguns editores)
+
+root = true
+
+# =============================================================================
+# PADRÃO GLOBAL — aplicado a tudo que não tem regra específica abaixo
+# =============================================================================
+[*]
+charset                  = utf-8
+end_of_line              = lf
+indent_style             = space
+indent_size              = 2
+trim_trailing_whitespace = true
+insert_final_newline     = true
+max_line_length          = 120
+
+# =============================================================================
+# JAVASCRIPT E TYPESCRIPT
+# Inclui: módulos ESM (.mjs), CommonJS (.cjs), config files (.js/.ts)
+# Padrão: 2 espaços — Prettier e ESLint usam isso como base
+# max_line_length = 100: balanceio entre legibilidade e linha curta
+# =============================================================================
+[*.{js,jsx,ts,tsx,mjs,cjs}]
+indent_size     = 2
+max_line_length = 100
+
+# =============================================================================
+# JSON E VARIANTES
+# package.json, tsconfig.json, .prettierrc, .eslintrc, etc.
+# max_line_length = 120: JSON pode ter strings longas em configs
+# =============================================================================
+[*.{json,jsonc,json5}]
+indent_size     = 2
+max_line_length = 120
+
+# =============================================================================
+# HTML / TEMPLATES
+# indent_size = 2: padrão web
+# max_line_length = 120: atributos HTML podem ser verbosos
+# =============================================================================
+[*.{html,htm}]
+indent_size     = 2
+max_line_length = 120
+
+# =============================================================================
+# CSS / SASS / LESS
+# indent_size = 2: padrão para stylesheets
+# max_line_length = 100: regras CSS curtas são mais legíveis
+# =============================================================================
+[*.{css,scss,sass,less}]
+indent_size     = 2
+max_line_length = 100
+
+# =============================================================================
+# PYTHON
+# indent_size = 4: PEP 8 obrigatório
+# max_line_length = 88: padrão do Black (não 79 do PEP 8 — Black é mais pragmático)
+# =============================================================================
+[*.py]
+indent_size     = 4
+max_line_length = 88
+
+# =============================================================================
+# C# / .NET
+# indent_size = 4: convenção Microsoft e Roslyn
+# max_line_length = 120: padrão Microsoft C# coding guidelines
+# =============================================================================
+[*.{cs,csx}]
+indent_size     = 4
+max_line_length = 120
+
+# Arquivos de projeto .NET (XML-based)
+[*.{csproj,vbproj,fsproj,props,targets,ruleset}]
+indent_size     = 2
+max_line_length = 200
+
+# =============================================================================
+# SQL
+# indent_size = 2: mais compacto — queries aninhadas ficam legíveis
+# max_line_length = 120: CTEs e JOINs podem ser longos
+# =============================================================================
+[*.{sql,pgsql,psql}]
+indent_size     = 2
+max_line_length = 120
+
+# =============================================================================
+# YAML
+# indent_size = 2: spec YAML exige consistência — 2 é o mais comum
+# max_line_length = 120: CI/CD pipelines têm valores longos
+# ATENÇÃO: YAML é sensível a tabs — nunca usar indent_style = tab aqui
+# =============================================================================
+[*.{yml,yaml}]
+indent_style    = space
+indent_size     = 2
+max_line_length = 120
+
+# =============================================================================
+# TOML
+# Usado por: Poetry (pyproject.toml), Cargo (Rust), configs modernas
+# indent_size = 2: padrão da comunidade TOML
+# =============================================================================
+[*.toml]
+indent_size     = 2
+max_line_length = 120
+
+# =============================================================================
+# MARKDOWN
+# trim_trailing_whitespace = false: dois espaços no fim de linha = <br> em Markdown
+#   — remover quebraria formatação intencional
+# max_line_length = off: textos podem ser longos; wrapping é responsabilidade do editor
+# =============================================================================
+[*.{md,mdx,mdc}]
+trim_trailing_whitespace = false
+indent_size              = 2
+max_line_length          = off
+
+# =============================================================================
+# XML / SVG / CONFIGURAÇÕES
+# indent_size = 2: mais compacto que 4 para arquivos de config
+# max_line_length = 200: atributos XML podem ser longos
+# =============================================================================
+[*.{xml,svg,xaml,config,props}]
+indent_size     = 2
+max_line_length = 200
+
+# =============================================================================
+# VARIÁVEIS DE AMBIENTE
+# max_line_length = off: values de env podem ser longos (tokens, connection strings)
+# trim = true: espaços acidentais antes/depois do = causam bugs silenciosos
+# =============================================================================
+[*.{env,env.example,env.local,env.development,env.production}]
+trim_trailing_whitespace = true
+max_line_length          = off
+
+# =============================================================================
+# SCRIPTS SHELL / BASH / ZSH
+# end_of_line = lf: scripts Unix SEMPRE precisam de LF — CRLF quebra o shebang
+# =============================================================================
+[*.{sh,bash,zsh}]
+end_of_line = lf
+indent_size = 2
+
+# =============================================================================
+# POWERSHELL
+# end_of_line = crlf: Windows-native — alguns cmdlets esperam CRLF
+# indent_size = 4: convenção da comunidade PowerShell e PSScriptAnalyzer
+# =============================================================================
+[*.{ps1,psm1,psd1}]
+end_of_line = crlf
+indent_size = 4
+
+# =============================================================================
+# BATCH SCRIPTS WINDOWS (.bat, .cmd)
+# end_of_line = crlf: cmd.exe no Windows requer CRLF
+# =============================================================================
+[*.{bat,cmd}]
+end_of_line = crlf
+indent_size = 4
+
+# =============================================================================
+# MAKEFILES
+# indent_style = tab: Makefiles exigem tab — espaços quebram o make
+# =============================================================================
+[Makefile]
+indent_style = tab
+tab_width    = 4
+
+# =============================================================================
+# DOCKER
+# =============================================================================
+[Dockerfile]
+indent_size = 4
+
+[*.{dockerignore,gitignore,npmignore,eslintignore,prettierignore}]
+trim_trailing_whitespace = true
+
+# =============================================================================
+# CONFIGURAÇÕES DE FERRAMENTAS (sem regras especiais além do padrão global)
+# Declarados explicitamente para documentar que foram considerados
+# =============================================================================
+[*.{prettierrc,eslintrc,stylelintrc,babelrc,browserslistrc}]
+indent_size = 2
